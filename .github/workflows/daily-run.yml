@@ -1,0 +1,57 @@
+name: Daily Coding Bot Run
+
+on:
+  schedule:
+    # Runs at 08:00 UTC every day. Adjust the cron time as needed for your timezone.
+    - cron: '0 8 * * *'
+  workflow_dispatch: # Allows manual trigger from the GitHub Actions UI
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # Adjust if you need a specific version
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: Install Playwright Browsers
+        run: playwright install chromium
+          
+      - name: Run main.py
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
+          LEETCODE_CSRF_TOKEN: ${{ secrets.LEETCODE_CSRF_TOKEN }}
+          CODEFORCES_API_KEY: ${{ secrets.CODEFORCES_API_KEY }}
+          CODEFORCES_API_SECRET: ${{ secrets.CODEFORCES_API_SECRET }}
+          CODEFORCES_HANDLE: ${{ secrets.CODEFORCES_HANDLE }}
+          CODECHEF_USERNAME: ${{ secrets.CODECHEF_USERNAME }}
+          CODECHEF_PASSWORD: ${{ secrets.CODECHEF_PASSWORD }}
+          HACKERRANK_USERNAME: ${{ secrets.HACKERRANK_USERNAME }}
+          HACKERRANK_PASSWORD: ${{ secrets.HACKERRANK_PASSWORD }}
+          DAILY_RUN_TIME: "08:00"
+          SOLUTION_LANGUAGE: "cpp"
+          LOG_LEVEL: "INFO"
+        run: python main.py
+
+      - name: Commit and push changes
+        run: |
+          git config --global user.name "Varshitha Somashekar"
+          git config --global user.email "varshithasomashekar22@gmail.com"
+          git add solutions/
+          # Commit only if there are changes
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: automate daily coding bot run [skip ci]" && git push)
+

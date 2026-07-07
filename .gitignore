@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.env
+daily_bot.db
+logs/
+codechef_login.png
+codechef_login.html
+codechef_dashboard.html
+codechef_practice.html
+hackerrank_dashboard.png
+hackerrank_dashboard.html
+hackerrank_domains.html
+.pytest_cache/
