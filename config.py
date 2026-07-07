@@ -93,7 +93,8 @@ class Config:
         "CODEFORCES_API_KEY",
         "CODEFORCES_API_SECRET",
         "CODEFORCES_HANDLE",
-        "CODEFORCES_PASSWORD",
+        # CODEFORCES_PASSWORD is optional — only needed for browser-based submission,
+        # not for problem fetching via the Codeforces API.
         "CODECHEF_USERNAME",
         "CODECHEF_PASSWORD",
         "HACKERRANK_USERNAME",
