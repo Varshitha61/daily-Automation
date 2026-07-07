@@ -1,5 +1,4 @@
 #include <iostream>
-using namespace std;
 
 int solveMeFirst(int a, int b) {
     return a + b;
@@ -7,8 +6,7 @@ int solveMeFirst(int a, int b) {
 
 int main() {
     int a, b;
-    cin >> a >> b;
-    int sum = solveMeFirst(a, b);
-    cout << sum;
+    std::cin >> a >> b;
+    std::cout << solveMeFirst(a, b);
     return 0;
 }
