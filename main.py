@@ -43,10 +43,14 @@ from solver.groq_solver import solve_problem
 
 import platforms.submitters.leetcode_submit as lc_submit
 import platforms.submitters.codeforces_submit as cf_submit
+import platforms.submitters.codechef_submit as cc_submit
+import platforms.submitters.hackerrank_submit as hr_submit
 
 _SUBMITTERS = {
     "leetcode": lc_submit.submit_solution,
     "codeforces": cf_submit.submit_solution,
+    "codechef": cc_submit.submit_solution,
+    "hackerrank": hr_submit.submit_solution,
 }
 
 # ---------------------------------------------------------------------------
