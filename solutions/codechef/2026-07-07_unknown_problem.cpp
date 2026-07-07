@@ -1,23 +1,32 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <string>
+#include <cmath>
+
+using namespace std;
 
 int main() {
     int t;
-    std::cin >> t;
+    cin >> t;
     while (t--) {
         int n;
-        std::cin >> n;
-        std::vector<int> a(n);
+        cin >> n;
+        vector<int> a(n);
         for (int i = 0; i < n; i++) {
-            std::cin >> a[i];
+            cin >> a[i];
         }
-        std::sort(a.begin(), a.end());
         int ans = 0;
-        for (int i = 0; i < n - 1; i++) {
-            ans += a[i + 1] - a[i];
+        for (int i = 0; i < n; i++) {
+            for (int j = i + 1; j < n; j++) {
+                for (int k = j + 1; k < n; k++) {
+                    if (a[i] + a[j] + a[k] == 0) {
+                        ans++;
+                    }
+                }
+            }
         }
-        std::cout << ans << std::endl;
+        cout << ans << endl;
     }
     return 0;
 }
