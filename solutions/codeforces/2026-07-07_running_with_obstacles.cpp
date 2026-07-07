@@ -11,38 +11,37 @@ int main() {
     sort(a.begin(), a.end());
     int pos = 0;
     bool ok = true;
-    vector<string> ans;
+    vector<pair<string, int>> ans;
     while (pos < m) {
-        int run = s;
-        while (run > 0 && pos < m) {
-            if (binary_search(a.begin(), a.end(), pos)) {
-                ok = false;
-                break;
-            }
-            pos++;
-            run--;
-        }
-        if (!ok) break;
-        ans.push_back("RUN " + to_string(s));
-        if (pos >= m) break;
-        int jump = d;
-        while (jump > 0 && pos < m) {
-            if (binary_search(a.begin(), a.end(), pos)) {
-                pos++;
-                jump--;
-            } else {
+        int next_pos = pos + s;
+        int next_obstacle = -1;
+        for (int i = 0; i < n; i++) {
+            if (a[i] > pos && a[i] <= next_pos) {
+                next_obstacle = a[i];
                 break;
             }
         }
-        ans.push_back("JUMP " + to_string(d - jump));
-        pos += jump;
+        if (next_obstacle != -1) {
+            int jump_len = min(d, next_obstacle + d - pos);
+            int land_pos = next_obstacle + 1;
+            ans.push_back({"RUN", next_obstacle - pos});
+            ans.push_back({"JUMP", jump_len});
+            pos = land_pos;
+        } else {
+            ans.push_back({"RUN", m - pos});
+            pos = m;
+        }
+        if (pos < m && next_obstacle == m) {
+            ok = false;
+            break;
+        }
     }
-    if (pos >= m) {
-        for (auto& x : ans) {
-            cout << x << endl;
-        }
-    } else {
+    if (!ok) {
         cout << "IMPOSSIBLE" << endl;
+    } else {
+        for (auto p : ans) {
+            cout << p.first << " " << p.second << endl;
+        }
     }
     return 0;
 }

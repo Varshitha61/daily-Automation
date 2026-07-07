@@ -96,6 +96,10 @@ def submit_solution(problem: dict, code: str) -> dict:
         "Submitting '%s' [id=%s] to LeetCode in %s...",
         problem.get("title", slug), question_id, lang,
     )
+    
+    # Add a delay to avoid rate limiting (429 Too Many Requests) 
+    # especially during retries
+    time.sleep(10)
 
     session = _build_session()
 

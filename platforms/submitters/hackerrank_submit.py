@@ -85,18 +85,31 @@ def submit_solution(problem: dict, code: str) -> dict:
                 logger.warning("Could not find HackerRank editor on the page.")
 
             # Inject the code into the editor.
-            textarea = page.locator(".inputarea").first
-            if textarea.count() > 0:
-                textarea.click()
-                page.keyboard.press("Control+A")
-                page.keyboard.press("Backspace")
-                
-                # Copy code to clipboard and paste
-                page.evaluate("async (text) => await navigator.clipboard.writeText(text)", code)
-                page.keyboard.press("Control+V")
-                time.sleep(1)
-            else:
-                logger.warning("Could not find HackerRank editor textarea.")
+            injected = page.evaluate("""(code) => {
+                if (typeof monaco !== 'undefined' && monaco.editor.getModels().length > 0) {
+                    monaco.editor.getModels()[0].setValue(code);
+                    return true;
+                }
+                let cm = document.querySelector('.CodeMirror');
+                if (cm && cm.CodeMirror) {
+                    cm.CodeMirror.setValue(code);
+                    return true;
+                }
+                return false;
+            }""", code)
+            
+            if not injected:
+                logger.warning("Could not find HackerRank editor via JS. Attempting fallback.")
+                textarea = page.locator(".inputarea").first
+                if textarea.count() > 0:
+                    textarea.click()
+                    page.keyboard.press("Control+A")
+                    page.keyboard.press("Backspace")
+                    page.evaluate("async (text) => await navigator.clipboard.writeText(text)", code)
+                    page.keyboard.press("Control+V")
+                    time.sleep(1)
+                else:
+                    logger.warning("Could not find HackerRank editor textarea fallback.")
 
             # Click Submit Code
             try:

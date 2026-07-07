@@ -52,6 +52,7 @@ class Config:
     CODEFORCES_API_KEY: str = os.getenv("CODEFORCES_API_KEY", "")
     CODEFORCES_API_SECRET: str = os.getenv("CODEFORCES_API_SECRET", "")
     CODEFORCES_HANDLE: str = os.getenv("CODEFORCES_HANDLE", "")
+    CODEFORCES_PASSWORD: str = os.getenv("CODEFORCES_PASSWORD", "")
 
     # ------------------------------------------------------------------
     # CodeChef
@@ -92,6 +93,7 @@ class Config:
         "CODEFORCES_API_KEY",
         "CODEFORCES_API_SECRET",
         "CODEFORCES_HANDLE",
+        "CODEFORCES_PASSWORD",
         "CODECHEF_USERNAME",
         "CODECHEF_PASSWORD",
         "HACKERRANK_USERNAME",

@@ -90,19 +90,27 @@ def submit_solution(problem: dict, code: str) -> dict:
                     pass
 
             # Inject the code into the editor. 
-            # CodeChef uses Monaco Editor. Best way is to clear and copy-paste.
-            textarea = page.locator(".inputarea")
-            if textarea.count() > 0:
-                textarea.first.click()
-                page.keyboard.press("Control+A")
-                page.keyboard.press("Backspace")
-                
-                # Copy code to clipboard and paste
-                page.evaluate("async (text) => await navigator.clipboard.writeText(text)", code)
-                page.keyboard.press("Control+V")
-                time.sleep(1) # Let the editor register the paste
-            else:
-                logger.warning("Could not find CodeChef editor textarea.")
+            # CodeChef uses Monaco Editor.
+            injected = page.evaluate("""(code) => {
+                if (typeof monaco !== 'undefined' && monaco.editor.getModels().length > 0) {
+                    monaco.editor.getModels()[0].setValue(code);
+                    return true;
+                }
+                return false;
+            }""", code)
+            
+            if not injected:
+                logger.warning("Could not inject code via Monaco API. Attempting fallback.")
+                textarea = page.locator(".inputarea").first
+                if textarea.count() > 0:
+                    textarea.click()
+                    page.keyboard.press("Control+A")
+                    page.keyboard.press("Backspace")
+                    page.evaluate("async (text) => await navigator.clipboard.writeText(text)", code)
+                    page.keyboard.press("Control+V")
+                    time.sleep(1)
+                else:
+                    logger.warning("Could not find CodeChef editor textarea.")
 
             # Click the actual Submit button
             submit_btn = page.locator("button:has-text('Submit')").last
