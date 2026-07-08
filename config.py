@@ -88,8 +88,10 @@ class Config:
         "GROQ_API_KEY",
         "TELEGRAM_BOT_TOKEN",
         "TELEGRAM_CHAT_ID",
-        "LEETCODE_SESSION",
-        "LEETCODE_CSRF_TOKEN",
+        # LEETCODE_SESSION and LEETCODE_CSRF_TOKEN are intentionally OPTIONAL here.
+        # Browser session cookies expire frequently; their absence should only skip
+        # LeetCode — not crash the entire bot before other platforms run.
+        # Use has_leetcode_credentials() to check before the LeetCode pipeline.
         "CODEFORCES_API_KEY",
         "CODEFORCES_API_SECRET",
         "CODEFORCES_HANDLE",
@@ -134,6 +136,29 @@ class Config:
             )
 
         logger.info("Config validation passed — all required keys are present.")
+        if not cls.has_leetcode_credentials():
+            logger.warning(
+                "LEETCODE_SESSION / LEETCODE_CSRF_TOKEN are missing or empty. "
+                "LeetCode will be skipped this run. "
+                "Update the GitHub secret with fresh browser cookies to re-enable."
+            )
+
+    @classmethod
+    def has_leetcode_credentials(cls) -> bool:
+        """
+        Return True only when both LeetCode auth cookies are non-empty.
+
+        LeetCode session cookies expire frequently.  Callers should use this
+        helper to decide whether to attempt the LeetCode pipeline rather than
+        letting it fail deep inside the fetcher or submitter.
+
+        Returns:
+            bool: True if LEETCODE_SESSION and LEETCODE_CSRF_TOKEN are set.
+        """
+        return bool(
+            cls.LEETCODE_SESSION and cls.LEETCODE_SESSION.strip()
+            and cls.LEETCODE_CSRF_TOKEN and cls.LEETCODE_CSRF_TOKEN.strip()
+        )
 
     @classmethod
     def get_run_hour_minute(cls) -> tuple[int, int]:

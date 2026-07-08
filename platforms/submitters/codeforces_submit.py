@@ -1,20 +1,39 @@
 """
-platforms/submitters/codeforces_submit.py — Codeforces solution submitter using Playwright.
+platforms/submitters/codeforces_submit.py — Codeforces solution submitter.
 
-Submits an AI-generated solution to Codeforces by logging in via the web form and submitting.
+Uses a pre-authenticated browser session (Playwright storage state JSON) to
+submit solutions — bypassing the Cloudflare-protected login page entirely.
+
+WHY COOKIE-BASED AUTH?
+Codeforces uses Cloudflare bot protection on its login page.  A headless
+Playwright browser running in GitHub Actions (a datacenter IP) is instantly
+blocked before it can even see the login form.  The workaround is to:
+  1. Log in once in your REAL browser (Chrome / Firefox)
+  2. Export the cookies via the helper script (export_cf_cookies.py)
+  3. Store the JSON in the GitHub Secret CF_COOKIES_JSON
 
 Flow:
-  1. Launch Playwright browser
-  2. Log in using CODEFORCES_HANDLE and CODEFORCES_PASSWORD
-  3. Navigate to problem submit page
-  4. Fill in the code and submit
-  5. Wait for the verdict on the status page
+  1. Load the cookie JSON from CF_COOKIES_JSON env var → inject into context
+  2. Navigate directly to the problemset submit page (skip login entirely)
+  3. Select language, inject code, click Submit
+  4. Poll the "my status" page for verdict
+
+Fallback:
+  If CF_COOKIES_JSON is not set, attempt the form-based login as a last
+  resort (works locally / on non-datacenter IPs).
+
+Required GitHub Secrets:
+    CF_COOKIES_JSON     — Playwright storage-state JSON (see export_cf_cookies.py)
+    CODEFORCES_HANDLE   — your handle (used to verify login state)
+    CODEFORCES_PASSWORD — only used in the local fallback login path
 """
 
+import json
 import logging
+import os
 import time
-from typing import Optional
 from pathlib import Path
+from typing import Optional
 
 from playwright.sync_api import (
     sync_playwright,
@@ -28,87 +47,229 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
-# Path to the persistent browser profile
+# Persistent session file (used when running locally)
 _STORAGE_STATE_PATH: Path = (
     Path(__file__).parent.parent.parent / "logs" / "codeforces_session.json"
 )
 
-_WAIT_MS: int = 45_000
+_WAIT_MS: int = 60_000
 
-# Codeforces compiler IDs
+# Codeforces compiler IDs — keep in sync with what the site accepts
 _LANG_MAP = {
-    "cpp":    "54",   # GNU G++17 7.3.0
-    "c++":    "54",
-    "python": "31",   # Python 3
-    "java":   "36",   # Java 8
-    "c":      "43",   # GNU GCC C11 5.1.0
+    "cpp":     "54",   # GNU G++17 7.3.0
+    "c++":     "54",
+    "python":  "31",   # Python 3.8.12
+    "python3": "31",
+    "java":    "36",   # Java 8
+    "c":       "43",   # GNU GCC C11 5.1.0
 }
 
 
+# ---------------------------------------------------------------------------
+# Browser helpers
+# ---------------------------------------------------------------------------
+
+def _launch_browser(p) -> Browser:
+    """Chromium with stealth-friendly flags suitable for CI."""
+    return p.chromium.launch(
+        headless=True,
+        args=[
+            "--disable-blink-features=AutomationControlled",
+            "--no-sandbox",
+            "--disable-setuid-sandbox",
+            "--disable-dev-shm-usage",
+            "--disable-gpu",
+            "--window-size=1280,800",
+        ],
+    )
+
+
 def _build_context(browser: Browser) -> BrowserContext:
-    user_agent = (
+    """
+    Create a BrowserContext, injecting cookies from one of three sources
+    (highest → lowest priority):
+
+    1. CF_COOKIES_JSON env var  — set this in GitHub Actions secrets
+    2. Local session file       — saved after a successful form login
+    3. Fresh context            — no cookies at all (login page will be shown)
+    """
+    ua = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/124.0.0.0 Safari/537.36"
     )
-
-    if _STORAGE_STATE_PATH.exists():
-        return browser.new_context(
-            storage_state=str(_STORAGE_STATE_PATH),
-            user_agent=user_agent,
-            permissions=["clipboard-read", "clipboard-write"],
-        )
-
-    return browser.new_context(
-        user_agent=user_agent,
-        permissions=["clipboard-read", "clipboard-write"]
+    base_kwargs = dict(
+        user_agent=ua,
+        viewport={"width": 1280, "height": 800},
+        locale="en-US",
     )
 
+    # Priority 1: GitHub secret
+    raw = os.getenv("CF_COOKIES_JSON", "").strip()
+    if raw:
+        logger.info("Loading Codeforces cookies from CF_COOKIES_JSON env var.")
+        try:
+            state = json.loads(raw)
+            return browser.new_context(storage_state=state, **base_kwargs)
+        except Exception as e:
+            logger.warning("Failed to parse CF_COOKIES_JSON: %s", e)
 
-def login(page: Page):
-    """Log in to Codeforces."""
-    logger.info("Logging in to Codeforces as '%s'...", Config.CODEFORCES_HANDLE)
-    page.goto("https://codeforces.com/enter", timeout=_WAIT_MS, wait_until="domcontentloaded")
+    # Priority 2: local session file
+    if _STORAGE_STATE_PATH.exists():
+        logger.info("Loading saved Codeforces session from %s", _STORAGE_STATE_PATH)
+        return browser.new_context(
+            storage_state=str(_STORAGE_STATE_PATH), **base_kwargs
+        )
 
-    # If already logged in, the handle will appear in the top right
+    # Priority 3: fresh (will need to log in via form)
+    logger.info("No saved Codeforces session found — will attempt form login.")
+    return browser.new_context(**base_kwargs)
+
+
+# ---------------------------------------------------------------------------
+# Session verification & form login (fallback)
+# ---------------------------------------------------------------------------
+
+def _is_logged_in(page: Page) -> bool:
+    """Return True if the page shows the user's handle (i.e. logged in)."""
+    handle = Config.CODEFORCES_HANDLE.lower()
     try:
-        page.wait_for_selector(f"a:has-text('{Config.CODEFORCES_HANDLE}')", timeout=5_000)
-        logger.info("Codeforces already logged in.")
-        return
+        page.wait_for_selector(
+            f"a[href*='/profile/{handle}'], "
+            f"a[href*='/profile/{Config.CODEFORCES_HANDLE}']",
+            timeout=5_000,
+        )
+        return True
     except PWTimeout:
-        pass
+        return False
+
+
+def _verify_or_login(page: Page) -> None:
+    """
+    Check whether the injected cookies are valid by visiting the home page.
+    If not logged in, attempt the form-based login (works locally / on
+    non-datacenter IPs).
+    """
+    page.goto("https://codeforces.com/", timeout=_WAIT_MS, wait_until="domcontentloaded")
+    time.sleep(2)
+
+    if _is_logged_in(page):
+        logger.info("Codeforces: session valid — logged in as '%s'.", Config.CODEFORCES_HANDLE)
+        return
+
+    logger.warning(
+        "Codeforces: injected cookies are expired or missing. "
+        "Attempting form login (may fail in GitHub Actions due to Cloudflare)."
+    )
+    _form_login(page)
+
+
+def _form_login(page: Page) -> None:
+    """
+    Form-based login — only works from non-datacenter IPs.
+    In GitHub Actions the Cloudflare challenge will block this; use
+    CF_COOKIES_JSON instead.
+    """
+    page.goto(
+        "https://codeforces.com/enter?back=%2F",
+        timeout=_WAIT_MS,
+        wait_until="domcontentloaded",
+    )
+    time.sleep(3)
+
+    if _is_logged_in(page):
+        logger.info("Already logged in after redirect.")
+        return
+
+    # Check for Cloudflare block
+    if "Just a moment" in (page.title() or ""):
+        raise RuntimeError(
+            "Cloudflare is blocking the headless browser on the Codeforces login page. "
+            "Set the CF_COOKIES_JSON GitHub secret with your exported browser cookies. "
+            "Run: python export_cf_cookies.py  to generate the JSON."
+        )
 
     try:
-        page.fill("input#handleOrEmail", Config.CODEFORCES_HANDLE)
-        page.fill("input#password", Config.CODEFORCES_PASSWORD)
-        page.click("input[type='submit'][value='Login']")
-        page.wait_for_selector(f"a:has-text('{Config.CODEFORCES_HANDLE}')", timeout=15_000)
-        logger.info("Codeforces login successful.")
-        
-        # Save state
-        _STORAGE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-        page.context.storage_state(path=str(_STORAGE_STATE_PATH))
-    except Exception as exc:
-        raise RuntimeError(f"Codeforces login failed: {exc}")
+        page.wait_for_selector("input#handleOrEmail", timeout=15_000)
+    except PWTimeout:
+        snippet = page.content()[:400]
+        raise RuntimeError(
+            f"Login form not found. URL={page.url}  snippet={snippet}"
+        )
 
+    page.fill("input#handleOrEmail", Config.CODEFORCES_HANDLE)
+    page.fill("input#password", Config.CODEFORCES_PASSWORD)
+    page.click("input[type='submit'][value='Login']")
+
+    try:
+        page.wait_for_selector(
+            f"a[href*='/profile/{Config.CODEFORCES_HANDLE.lower()}']",
+            timeout=15_000,
+        )
+        logger.info("Codeforces form login successful.")
+    except PWTimeout:
+        snippet = page.content()[:400]
+        raise RuntimeError(
+            f"Login failed — handle link not found. URL={page.url}  snippet={snippet}"
+        )
+
+    # Save session for next local run
+    _STORAGE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    page.context.storage_state(path=str(_STORAGE_STATE_PATH))
+    logger.info("Session saved to %s", _STORAGE_STATE_PATH)
+
+
+# ---------------------------------------------------------------------------
+# Code injection
+# ---------------------------------------------------------------------------
+
+def _inject_code(page: Page, code: str) -> bool:
+    """Try multiple strategies to fill the code into the textarea."""
+    # 1. Standard Playwright fill
+    try:
+        ta = page.wait_for_selector("textarea#sourceCodeTextarea", timeout=8_000)
+        ta.click()
+        ta.fill(code)
+        if ta.input_value() and len(ta.input_value()) > 5:
+            logger.debug("Code injected via direct fill.")
+            return True
+    except Exception as e:
+        logger.debug("Direct fill failed: %s", e)
+
+    # 2. JS assignment
+    try:
+        page.evaluate(
+            """(code) => {
+                const ta = document.getElementById('sourceCodeTextarea');
+                if (!ta) throw new Error('textarea not found');
+                ta.value = code;
+                ta.dispatchEvent(new Event('input',  {bubbles: true}));
+                ta.dispatchEvent(new Event('change', {bubbles: true}));
+            }""",
+            code,
+        )
+        logger.debug("Code injected via JS.")
+        return True
+    except Exception as e:
+        logger.debug("JS injection failed: %s", e)
+
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Main submit function
+# ---------------------------------------------------------------------------
 
 def submit_solution(problem: dict, code: str) -> dict:
     """
-    Submit a solution to Codeforces via Playwright.
+    Submit a solution to Codeforces.
 
     Args:
-        problem (dict): Must contain 'contest_id' and 'index'.
-        code    (str): Full source code to submit.
+        problem: Must contain 'contest_id' and 'index'.
+        code:    Full source code.
 
     Returns:
-        dict: {
-            "verdict":       str,
-            "submission_id": str,
-            "url":           str,
-            "accepted":      bool,
-            "runtime":       str,
-            "memory":        str,
-        }
+        dict with keys: verdict, submission_id, url, accepted, runtime, memory.
     """
     contest_id = str(problem.get("contest_id", ""))
     index      = str(problem.get("index", ""))
@@ -117,108 +278,138 @@ def submit_solution(problem: dict, code: str) -> dict:
 
     if not contest_id or not index:
         raise RuntimeError(
-            f"Codeforces submitter: missing 'contest_id' or 'index' in problem dict: {problem}"
+            f"Codeforces submitter: 'contest_id' or 'index' missing in: {problem}"
         )
 
-    logger.info("Submitting '%s' [%s%s] to Codeforces...", title, contest_id, index)
+    logger.info(
+        "Submitting '%s' [%s%s] to Codeforces (lang=%s)...",
+        title, contest_id, index, lang_id,
+    )
 
-    submit_url = f"https://codeforces.com/contest/{contest_id}/submit/{index}"
+    # Use the problemset submit URL (works for archived problems)
+    submit_url = (
+        f"https://codeforces.com/problemset/submit"
+        f"?contestId={contest_id}&index={index}"
+    )
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(
-            headless=True,
-            args=["--disable-blink-features=AutomationControlled"]
-        )
+        browser = _launch_browser(p)
         context = _build_context(browser)
-        page = context.new_page()
+        page    = context.new_page()
 
         try:
-            login(page)
-            
+            # ── 1. Verify session / login ──────────────────────────────────
+            _verify_or_login(page)
+
+            # ── 2. Navigate to submit page ─────────────────────────────────
+            logger.info("Opening submit page: %s", submit_url)
             page.goto(submit_url, timeout=_WAIT_MS, wait_until="domcontentloaded")
-            
-            # Select language
+            time.sleep(2)
+
+            # Abort if Cloudflare blocked us here too
+            if "Just a moment" in (page.title() or ""):
+                raise RuntimeError(
+                    "Cloudflare blocked the submit page request in the headless browser. "
+                    "Ensure CF_COOKIES_JSON contains valid, recent cookies."
+                )
+
+            # ── 3. Select language ─────────────────────────────────────────
             try:
+                page.wait_for_selector("select[name='programTypeId']", timeout=10_000)
                 page.select_option("select[name='programTypeId']", value=lang_id)
+                logger.debug("Language set to id=%s", lang_id)
             except Exception as e:
-                logger.warning("Could not select language ID %s: %s", lang_id, e)
-                
-            # Click toggle to plain text editor if toggle exists
+                logger.warning("Language selector not found: %s", e)
+
+            # ── 4. Disable Monaco editor toggle if present ─────────────────
             try:
                 toggle = page.locator("a#toggleEditorCheckbox")
-                if toggle.count() > 0 and "toggle-on" in toggle.get_attribute("class"):
+                if toggle.count() > 0 and "toggle-on" in (toggle.get_attribute("class") or ""):
                     toggle.click()
+                    time.sleep(1)
             except Exception:
                 pass
 
-            # Inject code
-            try:
-                page.fill("textarea#sourceCodeTextarea", code, timeout=10_000)
-            except Exception as e:
-                logger.warning("Failed to fill sourceCodeTextarea: %s", e)
-                # Fallback to copy-paste
-                page.evaluate("async (text) => await navigator.clipboard.writeText(text)", code)
-                page.click("textarea#sourceCodeTextarea")
-                page.keyboard.press("Control+V")
-                time.sleep(1)
-                
-            # Submit
+            # ── 5. Inject code ─────────────────────────────────────────────
+            if not _inject_code(page, code):
+                raise RuntimeError(
+                    "Could not inject code — the textarea may be inside a Monaco editor. "
+                    "Check the page HTML and update _inject_code() selectors."
+                )
+
+            # ── 6. Submit ──────────────────────────────────────────────────
+            logger.info("Clicking Submit button...")
             page.click("input[type='submit'][value='Submit']")
-            
-            # Wait for redirect to status page
+
             try:
-                page.wait_for_url("**/my**", timeout=15_000)
+                page.wait_for_url("**/status**", timeout=15_000)
             except PWTimeout:
-                logger.warning("Codeforces submit redirect timeout. Continuing to check verdict...")
-                
-            # Poll for verdict in the table
-            submission_id = "unknown"
-            verdict = "Pending"
-            accepted = False
-            runtime = ""
-            memory_str = ""
-            sub_url = ""
-            
-            # Go to my submissions page for the contest
-            status_url = f"https://codeforces.com/contest/{contest_id}/my"
-            if not page.url.startswith(status_url):
-                page.goto(status_url, timeout=_WAIT_MS, wait_until="domcontentloaded")
-            
-            for attempt in range(1, 20):
+                logger.warning("No redirect to status page detected; continuing to poll.")
+
+            time.sleep(3)
+
+            # ── 7. Poll verdict ────────────────────────────────────────────
+            my_status_url = "https://codeforces.com/problemset/status?friends=on"
+            page.goto(my_status_url, timeout=_WAIT_MS, wait_until="domcontentloaded")
+
+            submission_id: str = "unknown"
+            verdict:       str = "Pending"
+            accepted:      bool = False
+            runtime:       str = ""
+            memory_str:    str = ""
+            sub_url:       str = ""
+
+            for attempt in range(1, 25):
                 try:
-                    # Find the first row in the status table
-                    row = page.locator("table.status-frame-datatable tr[data-submission-id]").first
+                    row = page.locator(
+                        "table.status-frame-datatable tr[data-submission-id]"
+                    ).first
                     row.wait_for(timeout=10_000)
-                    
-                    submission_id = row.get_attribute("data-submission-id")
-                    sub_url = f"https://codeforces.com/contest/{contest_id}/submission/{submission_id}"
-                    
-                    verdict_cell = row.locator("td.status-verdict-cell")
-                    verdict_text = verdict_cell.inner_text().strip()
-                    
-                    if not verdict_text or "Running" in verdict_text or "In queue" in verdict_text or "Pending" in verdict_text:
+
+                    submission_id = row.get_attribute("data-submission-id") or "unknown"
+                    sub_url = (
+                        f"https://codeforces.com/contest/{contest_id}"
+                        f"/submission/{submission_id}"
+                    )
+
+                    verdict_text = row.locator("td.status-verdict-cell").inner_text().strip()
+
+                    if not verdict_text or any(
+                        s in verdict_text
+                        for s in ("Running", "In queue", "Pending", "Judging")
+                    ):
+                        logger.debug("Attempt %d — not ready: '%s'", attempt, verdict_text)
                         time.sleep(3)
                         page.reload()
                         continue
-                        
-                    verdict = verdict_text.splitlines()[0] if verdict_text else "Unknown"
-                    accepted = ("Accepted" in verdict or "Happy New Year" in verdict)
-                    
+
+                    verdict  = verdict_text.splitlines()[0] if verdict_text else "Unknown"
+                    accepted = "Accepted" in verdict
+
                     try:
-                        time_cell = row.locator("td.time-consumed-cell").inner_text().strip()
-                        mem_cell = row.locator("td.memory-consumed-cell").inner_text().strip()
-                        runtime = time_cell
-                        memory_str = mem_cell
+                        runtime    = row.locator("td.time-consumed-cell").inner_text().strip()
+                        memory_str = row.locator("td.memory-consumed-cell").inner_text().strip()
                     except Exception:
                         pass
-                        
-                    logger.info("Codeforces verdict: %s | Runtime: %s | Memory: %s", verdict, runtime, memory_str)
+
+                    logger.info(
+                        "Verdict: %s | id=%s | time=%s | mem=%s",
+                        verdict, submission_id, runtime or "N/A", memory_str or "N/A",
+                    )
                     break
+
                 except Exception as e:
-                    logger.warning("Error reading Codeforces verdict: %s", e)
+                    logger.warning("Attempt %d — error reading verdict: %s", attempt, e)
                     time.sleep(3)
                     page.reload()
-                    
+
+            # Persist session for next local run
+            try:
+                _STORAGE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+                page.context.storage_state(path=str(_STORAGE_STATE_PATH))
+            except Exception:
+                pass
+
             return {
                 "verdict":       verdict,
                 "submission_id": submission_id,

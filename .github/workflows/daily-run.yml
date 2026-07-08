@@ -46,6 +46,7 @@ jobs:
           CODECHEF_PASSWORD: ${{ secrets.CODECHEF_PASSWORD }}
           HACKERRANK_USERNAME: ${{ secrets.HACKERRANK_USERNAME }}
           HACKERRANK_PASSWORD: ${{ secrets.HACKERRANK_PASSWORD }}
+          CF_COOKIES_JSON: ${{ secrets.CF_COOKIES_JSON }}
           DAILY_RUN_TIME: "08:00"
           SOLUTION_LANGUAGE: "cpp"
           LOG_LEVEL: "INFO"

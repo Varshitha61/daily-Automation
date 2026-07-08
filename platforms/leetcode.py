@@ -139,6 +139,16 @@ def _graphql_post(
                 json=payload,
                 timeout=Config.REQUEST_TIMEOUT,
             )
+
+            # Detect expired / invalid session cookies early
+            if response.status_code in (401, 403):
+                raise RuntimeError(
+                    f"LeetCode returned HTTP {response.status_code} — your "
+                    "LEETCODE_SESSION / LEETCODE_CSRF_TOKEN cookies have most likely "
+                    "expired. Log into leetcode.com in your browser, copy the fresh "
+                    "cookies, and update the GitHub Actions secrets."
+                )
+
             response.raise_for_status()
             data = response.json()
 
@@ -232,6 +242,15 @@ def fetch_daily_problem() -> dict:
             f"Unexpected LeetCode API response structure: {exc}\n"
             f"Raw response keys: {list(data.get('data', {}).keys())}"
         ) from exc
+
+    # challenge / question can be None when cookies are expired
+    if challenge is None or question is None:
+        raise RuntimeError(
+            "LeetCode returned null for the daily challenge — your "
+            "LEETCODE_SESSION / LEETCODE_CSRF_TOKEN cookies have most likely "
+            "expired. Log into leetcode.com in your browser, copy the fresh "
+            "cookies, and update the GitHub Actions secrets."
+        )
 
     title: str = question["title"]
     slug: str = question["titleSlug"]

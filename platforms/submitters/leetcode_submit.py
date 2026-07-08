@@ -112,6 +112,13 @@ def submit_solution(problem: dict, code: str) -> dict:
     }
 
     resp = session.post(submit_url, json=payload, timeout=30)
+    if resp.status_code in (401, 403):
+        raise RuntimeError(
+            f"LeetCode submission rejected with HTTP {resp.status_code} — "
+            "your LEETCODE_SESSION / LEETCODE_CSRF_TOKEN cookies have most likely "
+            "expired. Log into leetcode.com in your browser, copy the fresh cookies, "
+            "and update the GitHub Actions secrets."
+        )
     if resp.status_code not in (200, 201):
         raise RuntimeError(
             f"LeetCode submission POST failed: {resp.status_code} — {resp.text[:300]}"

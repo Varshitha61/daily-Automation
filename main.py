@@ -357,6 +357,27 @@ async def run_daily_bot() -> None:
 
     # Step 3 — Run each platform sequentially
     for platform_name, fetch_fn in platforms:
+        # LeetCode requires fresh browser cookies that expire regularly.
+        # Skip gracefully instead of failing with a cryptic 403 error.
+        if platform_name == "leetcode" and not Config.has_leetcode_credentials():
+            logger.warning(
+                "[LEETCODE] Skipping — LEETCODE_SESSION / LEETCODE_CSRF_TOKEN "
+                "are not set or have expired. Update the GitHub secret with "
+                "fresh cookies from your browser."
+            )
+            try:
+                await asyncio.to_thread(
+                    telegram.send_error_notification,
+                    "leetcode",
+                    "Skipped: LEETCODE_SESSION / LEETCODE_CSRF_TOKEN are missing or expired. "
+                    "Log into leetcode.com in your browser, copy the fresh cookies, "
+                    "and update the GitHub Actions secrets.",
+                )
+            except Exception:
+                pass
+            failed.append(platform_name)
+            continue
+
         ok: bool = await _run_platform(platform_name, fetch_fn)
         if ok:
             succeeded.append(platform_name)
