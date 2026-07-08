@@ -298,20 +298,36 @@ def submit_solution(problem: dict, code: str) -> dict:
         page    = context.new_page()
 
         try:
-            # ── 1. Verify session / login ──────────────────────────────────
-            _verify_or_login(page)
-
-            # ── 2. Navigate to submit page ─────────────────────────────────
-            logger.info("Opening submit page: %s", submit_url)
+            # ── 1. Go directly to submit page (skip homepage / login page) ──
+            # Going to the login page triggers Cloudflare. The submit page
+            # itself is less protected — if our session cookies are valid,
+            # the form will appear directly.
+            logger.info("Opening submit page directly: %s", submit_url)
             page.goto(submit_url, timeout=_WAIT_MS, wait_until="domcontentloaded")
             time.sleep(2)
 
-            # Abort if Cloudflare blocked us here too
+            # Check if Cloudflare is blocking us
             if "Just a moment" in (page.title() or ""):
                 raise RuntimeError(
-                    "Cloudflare blocked the submit page request in the headless browser. "
-                    "Ensure CF_COOKIES_JSON contains valid, recent cookies."
+                    "Cloudflare blocked the submit page. "
+                    "CF_COOKIES_JSON cookies may have expired or are IP-bound. "
+                    "Update CF_COOKIES_JSON with fresh cookies from your browser."
                 )
+
+            # Check if we need to log in (Codeforces redirected to /enter)
+            if "/enter" in page.url or "login" in page.url.lower():
+                logger.warning("Session cookies not valid — redirected to login. Attempting form login...")
+                _form_login(page)
+                # After login, navigate back to submit page
+                page.goto(submit_url, timeout=_WAIT_MS, wait_until="domcontentloaded")
+                time.sleep(2)
+
+            # Verify the submit form is present
+            try:
+                page.wait_for_selector("input[type='submit'][value='Submit'], form#submitForm", timeout=10_000)
+                logger.info("Submit form found — session is valid.")
+            except PWTimeout:
+                logger.warning("Submit form not found on submit page. URL: %s", page.url)
 
             # ── 3. Select language ─────────────────────────────────────────
             try:
