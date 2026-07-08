@@ -58,7 +58,7 @@ jobs:
         run: |
           git config --global user.name "Varshitha Somashekar"
           git config --global user.email "varshithasomashekar22@gmail.com"
-          git add solutions/ logs/
+          git add solutions/
           # Only proceed if there are staged changes
           if git diff --staged --quiet; then
             echo "No changes to commit — skipping push."

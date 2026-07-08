@@ -166,17 +166,9 @@ def fetch_problem_statement(contest_id: int, index: str) -> str:
     logger.info("Scraping problem statement from %s", url)
 
     with sync_playwright() as pw:
-        browser = pw.chromium.launch(
-            headless=True,
-            args=["--disable-blink-features=AutomationControlled"]
-        )
-        context = browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            )
-        )
+        from platforms.submitters.codeforces_submit import _launch_browser, _build_context
+        browser = _launch_browser(pw)
+        context = _build_context(browser)
         page: Page = context.new_page()
 
         try:
