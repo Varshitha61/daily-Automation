@@ -56,7 +56,13 @@ jobs:
         run: |
           git config --global user.name "Varshitha Somashekar"
           git config --global user.email "varshithasomashekar22@gmail.com"
-          git add solutions/
-          # Commit only if there are changes
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: automate daily coding bot run [skip ci]" && git push)
-
+          git add solutions/ logs/
+          # Commit only if there are staged changes
+          if git diff --staged --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: automate daily coding bot run [skip ci]"
+            # Pull any remote changes (e.g. our own pushes) before pushing
+            git pull --rebase origin main
+            git push origin main
+          fi
