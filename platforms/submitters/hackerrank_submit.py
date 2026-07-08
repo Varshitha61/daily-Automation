@@ -114,7 +114,7 @@ def submit_solution(problem: dict, code: str) -> dict:
             # Click Submit Code
             try:
                 submit_btn = page.locator("button:has-text('Submit Code')")
-                submit_btn.click()
+                submit_btn.click(force=True)
             except Exception as e:
                 logger.warning("Failed to click 'Submit Code': %s", e)
             

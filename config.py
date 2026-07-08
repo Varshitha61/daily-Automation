@@ -37,8 +37,8 @@ class Config:
     # ------------------------------------------------------------------
     # Telegram
     # ------------------------------------------------------------------
-    TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
-    TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "").strip()
+    TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "").strip().replace("%0A", "")
+    TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "").strip().replace("%0A", "")
 
     # ------------------------------------------------------------------
     # LeetCode
