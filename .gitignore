@@ -1,13 +1,39 @@
-__pycache__/
-*.pyc
+# Environment & secrets — NEVER commit these
 .env
-daily_bot.db
+*.env
+
+# Logs and browser session files (contain auth cookies — keep private!)
 logs/
-codechef_login.png
-codechef_login.html
-codechef_dashboard.html
-codechef_practice.html
-hackerrank_dashboard.png
-hackerrank_dashboard.html
-hackerrank_domains.html
-.pytest_cache/
+*.log
+
+# SQLite database (runtime state, not source code)
+daily_bot.db
+daily_bot.db-shm
+daily_bot.db-wal
+
+# Scraped HTML debug files
+*.html
+*.png
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# IDE / OS
+.vscode/
+.idea/
+*.DS_Store
+Thumbs.db
+
+# Playwright state (session cookies — keep private!)
+*_session.json
+playwright-state.json
