@@ -31,24 +31,35 @@ jobs:
           
       - name: Install Playwright Browsers
         run: playwright install chromium
+        
+      - name: Install Playwright System Dependencies
+        run: playwright install-deps chromium
           
       - name: Run main.py
         env:
+          # ── AI / Notifications (REQUIRED) ─────────────────────────────────────
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # ── LeetCode (OPTIONAL — refresh cookies every few weeks) ──────────────
+          # Log into leetcode.com → DevTools → Application → Cookies
+          # Copy LEETCODE_SESSION and csrftoken values to GitHub secrets.
           LEETCODE_SESSION: ${{ secrets.LEETCODE_SESSION }}
           LEETCODE_CSRF_TOKEN: ${{ secrets.LEETCODE_CSRF_TOKEN }}
+          # ── Codeforces (REQUIRED — refresh CF_COOKIES_JSON when heatmap stops) ─
+          # Run: python export_cf_cookies.py  to regenerate CF_COOKIES_JSON
           CODEFORCES_API_KEY: ${{ secrets.CODEFORCES_API_KEY }}
           CODEFORCES_API_SECRET: ${{ secrets.CODEFORCES_API_SECRET }}
           CODEFORCES_HANDLE: ${{ secrets.CODEFORCES_HANDLE }}
           CODEFORCES_PASSWORD: ${{ secrets.CODEFORCES_PASSWORD }}
+          CF_COOKIES_JSON: ${{ secrets.CF_COOKIES_JSON }}
+          # ── CodeChef (REQUIRED) ────────────────────────────────────────────────
           CODECHEF_USERNAME: ${{ secrets.CODECHEF_USERNAME }}
           CODECHEF_PASSWORD: ${{ secrets.CODECHEF_PASSWORD }}
+          # ── HackerRank (REQUIRED) ──────────────────────────────────────────────
           HACKERRANK_USERNAME: ${{ secrets.HACKERRANK_USERNAME }}
           HACKERRANK_PASSWORD: ${{ secrets.HACKERRANK_PASSWORD }}
-          CF_COOKIES_JSON: ${{ secrets.CF_COOKIES_JSON }}
           DAILY_RUN_TIME: "08:00"
           SOLUTION_LANGUAGE: "cpp"
           LOG_LEVEL: "INFO"

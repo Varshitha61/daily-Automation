@@ -31,11 +31,14 @@ _SUBMISSION_URL = "https://leetcode.com/submissions/detail/{id}/"
 
 # Language ID map — LeetCode uses short string identifiers
 _LANG_MAP = {
-    "cpp":    "cpp",
-    "c++":    "cpp",
-    "python": "python3",
-    "java":   "java",
-    "c":      "c",
+    "cpp":     "cpp",
+    "c++":     "cpp",
+    "python":  "python3",
+    "python3": "python3",
+    "java":    "java",
+    "c":       "c",
+    "javascript": "javascript",
+    "typescript": "typescript",
 }
 
 # Poll settings

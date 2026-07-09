@@ -365,7 +365,7 @@ def submit_solution(problem: dict, code: str) -> dict:
             time.sleep(3)
 
             # ── 7. Poll verdict ────────────────────────────────────────────
-            my_status_url = "https://codeforces.com/problemset/status?friends=on"
+            my_status_url = "https://codeforces.com/problemset/status?my=on"
             page.goto(my_status_url, timeout=_WAIT_MS, wait_until="domcontentloaded")
 
             submission_id: str = "unknown"
