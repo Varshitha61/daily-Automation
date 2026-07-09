@@ -12,9 +12,10 @@ public:
 
     UnionFind(int n) {
         parent.resize(n);
-        rank.resize(n, 0);
+        rank.resize(n);
         for (int i = 0; i < n; i++) {
             parent[i] = i;
+            rank[i] = 0;
         }
     }
 
