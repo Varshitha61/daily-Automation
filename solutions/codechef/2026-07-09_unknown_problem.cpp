@@ -20,6 +20,11 @@ int main() {
                 ans = i + 1;
                 diff = a[i].first - a[i].second;
             }
+        } else {
+            if (a[i].second - a[i].first > diff) {
+                ans = i + 1;
+                diff = a[i].second - a[i].first;
+            }
         }
     }
 
