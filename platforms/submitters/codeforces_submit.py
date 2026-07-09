@@ -14,17 +14,13 @@ blocked before it can even see the login form.  The workaround is to:
 
 Flow:
   1. Load the cookie JSON from CF_COOKIES_JSON env var → inject into context
-  2. Navigate directly to the problemset submit page (skip login entirely)
+  2. Navigate directly to the problem submit page
   3. Select language, inject code, click Submit
-  4. Poll the "my status" page for verdict
-
-Fallback:
-  If CF_COOKIES_JSON is not set, attempt the form-based login as a last
-  resort (works locally / on non-datacenter IPs).
+  4. Poll https://codeforces.com/submissions/{handle} for verdict
 
 Required GitHub Secrets:
     CF_COOKIES_JSON     — Playwright storage-state JSON (see export_cf_cookies.py)
-    CODEFORCES_HANDLE   — your handle (used to verify login state)
+    CODEFORCES_HANDLE   — your handle (used to poll your own submissions)
     CODEFORCES_PASSWORD — only used in the local fallback login path
 """
 
@@ -257,6 +253,112 @@ def _inject_code(page: Page, code: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Verdict polling  (uses /submissions/{handle} — always shows YOUR submissions)
+# ---------------------------------------------------------------------------
+
+def _poll_verdict(page: Page, contest_id: str, index: str) -> dict:
+    """
+    Poll https://codeforces.com/submissions/{handle} for the latest
+    submission matching this contest/problem.
+
+    This URL always shows ONLY the logged-in user's own submissions,
+    unlike /problemset/status which shows everyone's.
+
+    Returns dict with verdict, submission_id, url, accepted, runtime, memory.
+    """
+    handle = Config.CODEFORCES_HANDLE
+    # User submissions page — reliably shows OUR OWN submissions
+    submissions_url = f"https://codeforces.com/submissions/{handle}"
+
+    logger.info("Polling submissions at: %s", submissions_url)
+    page.goto(submissions_url, timeout=_WAIT_MS, wait_until="domcontentloaded")
+    time.sleep(2)
+
+    submission_id: str = "unknown"
+    verdict:       str = "Pending"
+    accepted:      bool = False
+    runtime:       str = ""
+    memory_str:    str = ""
+    sub_url:       str = ""
+
+    for attempt in range(1, 30):
+        try:
+            # Find ALL submission rows for this exact problem
+            rows = page.locator("table.status-frame-datatable tr[data-submission-id]")
+            count = rows.count()
+
+            if count == 0:
+                logger.debug("Attempt %d — no submission rows found yet.", attempt)
+                time.sleep(3)
+                page.reload()
+                continue
+
+            # Find the row matching our contest+index (most recent one)
+            target_row = None
+            for i in range(min(count, 10)):  # check top 10 rows
+                row = rows.nth(i)
+                try:
+                    problem_cell = row.locator("td").nth(3).inner_text().strip()
+                    # Problem cell looks like "1234A" or "Contest Name - A"
+                    if contest_id in problem_cell or index in problem_cell:
+                        target_row = row
+                        break
+                except Exception:
+                    continue
+
+            # Fallback: use the very first (most recent) row
+            if target_row is None:
+                logger.debug("Attempt %d — no row matched %s%s, using first row.", attempt, contest_id, index)
+                target_row = rows.first
+
+            submission_id = target_row.get_attribute("data-submission-id") or "unknown"
+            sub_url = (
+                f"https://codeforces.com/contest/{contest_id}"
+                f"/submission/{submission_id}"
+            )
+
+            verdict_text = target_row.locator("td.status-verdict-cell").inner_text().strip()
+
+            if not verdict_text or any(
+                s in verdict_text
+                for s in ("Running on", "In queue", "Pending", "Judging", "Testing")
+            ):
+                logger.debug("Attempt %d — not ready: '%s'", attempt, verdict_text)
+                time.sleep(4)
+                page.reload()
+                continue
+
+            verdict  = verdict_text.splitlines()[0] if verdict_text else "Unknown"
+            accepted = "Accepted" in verdict
+
+            try:
+                runtime    = target_row.locator("td.time-consumed-cell").inner_text().strip()
+                memory_str = target_row.locator("td.memory-consumed-cell").inner_text().strip()
+            except Exception:
+                pass
+
+            logger.info(
+                "Codeforces verdict: %s | id=%s | time=%s | mem=%s",
+                verdict, submission_id, runtime or "N/A", memory_str or "N/A",
+            )
+            break
+
+        except Exception as e:
+            logger.warning("Attempt %d — error reading verdict: %s", attempt, e)
+            time.sleep(4)
+            page.reload()
+
+    return {
+        "verdict":       verdict,
+        "submission_id": submission_id,
+        "url":           sub_url,
+        "accepted":      accepted,
+        "runtime":       runtime,
+        "memory":        memory_str,
+    }
+
+
+# ---------------------------------------------------------------------------
 # Main submit function
 # ---------------------------------------------------------------------------
 
@@ -286,11 +388,11 @@ def submit_solution(problem: dict, code: str) -> dict:
         title, contest_id, index, lang_id,
     )
 
-    # Use the problemset submit URL (works for archived problems)
-    submit_url = (
-        f"https://codeforces.com/problemset/submit"
-        f"?contestId={contest_id}&index={index}"
-    )
+    # ── Submit URL: use the problem-specific contest submit page.
+    # This is more reliable than /problemset/submit for correctly
+    # pre-populating the problem index field.
+    # Try the contest-specific URL first; fall back to problemset URL.
+    submit_url = f"https://codeforces.com/contest/{contest_id}/submit/{index}"
 
     with sync_playwright() as p:
         browser = _launch_browser(p)
@@ -298,38 +400,59 @@ def submit_solution(problem: dict, code: str) -> dict:
         page    = context.new_page()
 
         try:
-            # ── 1. Go directly to submit page (skip homepage / login page) ──
-            # Going to the login page triggers Cloudflare. The submit page
-            # itself is less protected — if our session cookies are valid,
-            # the form will appear directly.
-            logger.info("Opening submit page directly: %s", submit_url)
+            # ── 1. Go directly to problem-specific submit page ──────────────
+            logger.info("Opening submit page: %s", submit_url)
             page.goto(submit_url, timeout=_WAIT_MS, wait_until="domcontentloaded")
-            time.sleep(2)
+            time.sleep(3)
 
             # Check if Cloudflare is blocking us
             if "Just a moment" in (page.title() or ""):
                 raise RuntimeError(
                     "Cloudflare blocked the submit page. "
                     "CF_COOKIES_JSON cookies may have expired or are IP-bound. "
-                    "Update CF_COOKIES_JSON with fresh cookies from your browser."
+                    "Update CF_COOKIES_JSON with fresh cookies from your browser.\n"
+                    "Run: python export_cf_cookies.py"
                 )
 
-            # Check if we need to log in (Codeforces redirected to /enter)
+            # Check if we need to log in (redirected to /enter)
             if "/enter" in page.url or "login" in page.url.lower():
-                logger.warning("Session cookies not valid — redirected to login. Attempting form login...")
+                logger.warning("Session cookies invalid — redirected to login. Attempting form login...")
                 _form_login(page)
-                # After login, navigate back to submit page
                 page.goto(submit_url, timeout=_WAIT_MS, wait_until="domcontentloaded")
-                time.sleep(2)
+                time.sleep(3)
+
+            # If the contest-specific URL didn't work, fall back to problemset/submit
+            if "submit" not in page.url and "enter" not in page.url:
+                logger.warning("Contest submit URL didn't work, trying problemset/submit...")
+                fallback_url = (
+                    f"https://codeforces.com/problemset/submit"
+                    f"?contestId={contest_id}&submittedProblemIndex={index}"
+                )
+                page.goto(fallback_url, timeout=_WAIT_MS, wait_until="domcontentloaded")
+                time.sleep(3)
 
             # Verify the submit form is present
             try:
-                page.wait_for_selector("input[type='submit'][value='Submit'], form#submitForm", timeout=10_000)
-                logger.info("Submit form found — session is valid.")
+                page.wait_for_selector(
+                    "input[type='submit'][value='Submit'], form#submitForm, #pageContent form",
+                    timeout=10_000
+                )
+                logger.info("Submit form found. Current URL: %s", page.url)
             except PWTimeout:
-                logger.warning("Submit form not found on submit page. URL: %s", page.url)
+                logger.warning("Submit form not found. URL: %s", page.url)
+                # Log page title to help debug
+                logger.warning("Page title: %s", page.title())
 
-            # ── 3. Select language ─────────────────────────────────────────
+            # ── 2. Fill in contested problem index (in case form needs it) ──
+            try:
+                problem_index_input = page.locator("input[name='submittedProblemIndex']")
+                if problem_index_input.count() > 0:
+                    problem_index_input.fill(index)
+                    logger.debug("Filled problem index: %s", index)
+            except Exception:
+                pass
+
+            # ── 3. Select language ──────────────────────────────────────────
             try:
                 page.wait_for_selector("select[name='programTypeId']", timeout=10_000)
                 page.select_option("select[name='programTypeId']", value=lang_id)
@@ -337,7 +460,7 @@ def submit_solution(problem: dict, code: str) -> dict:
             except Exception as e:
                 logger.warning("Language selector not found: %s", e)
 
-            # ── 4. Disable Monaco editor toggle if present ─────────────────
+            # ── 4. Disable Monaco editor toggle if present ──────────────────
             try:
                 toggle = page.locator("a#toggleEditorCheckbox")
                 if toggle.count() > 0 and "toggle-on" in (toggle.get_attribute("class") or ""):
@@ -346,78 +469,32 @@ def submit_solution(problem: dict, code: str) -> dict:
             except Exception:
                 pass
 
-            # ── 5. Inject code ─────────────────────────────────────────────
+            # ── 5. Inject code ──────────────────────────────────────────────
             if not _inject_code(page, code):
                 raise RuntimeError(
-                    "Could not inject code — the textarea may be inside a Monaco editor. "
+                    "Could not inject code into the Codeforces editor. "
                     "Check the page HTML and update _inject_code() selectors."
                 )
 
-            # ── 6. Submit ──────────────────────────────────────────────────
+            # ── 6. Submit ───────────────────────────────────────────────────
             logger.info("Clicking Submit button...")
-            page.click("input[type='submit'][value='Submit']")
-
             try:
-                page.wait_for_url("**/status**", timeout=15_000)
+                page.click("input[type='submit'][value='Submit']")
+            except Exception:
+                # Try alternate selector
+                page.click("button[type='submit']")
+
+            # Wait for page to navigate away from the submit form
+            try:
+                page.wait_for_url(lambda url: "submit" not in url.split("?")[0], timeout=15_000)
+                logger.info("Navigated after submit. URL: %s", page.url)
             except PWTimeout:
-                logger.warning("No redirect to status page detected; continuing to poll.")
+                logger.warning("No navigation after submit detected. URL: %s", page.url)
 
-            time.sleep(3)
+            time.sleep(5)  # give Codeforces time to register the submission
 
-            # ── 7. Poll verdict ────────────────────────────────────────────
-            my_status_url = "https://codeforces.com/problemset/status?my=on"
-            page.goto(my_status_url, timeout=_WAIT_MS, wait_until="domcontentloaded")
-
-            submission_id: str = "unknown"
-            verdict:       str = "Pending"
-            accepted:      bool = False
-            runtime:       str = ""
-            memory_str:    str = ""
-            sub_url:       str = ""
-
-            for attempt in range(1, 25):
-                try:
-                    row = page.locator(
-                        "table.status-frame-datatable tr[data-submission-id]"
-                    ).first
-                    row.wait_for(timeout=10_000)
-
-                    submission_id = row.get_attribute("data-submission-id") or "unknown"
-                    sub_url = (
-                        f"https://codeforces.com/contest/{contest_id}"
-                        f"/submission/{submission_id}"
-                    )
-
-                    verdict_text = row.locator("td.status-verdict-cell").inner_text().strip()
-
-                    if not verdict_text or any(
-                        s in verdict_text
-                        for s in ("Running", "In queue", "Pending", "Judging")
-                    ):
-                        logger.debug("Attempt %d — not ready: '%s'", attempt, verdict_text)
-                        time.sleep(3)
-                        page.reload()
-                        continue
-
-                    verdict  = verdict_text.splitlines()[0] if verdict_text else "Unknown"
-                    accepted = "Accepted" in verdict
-
-                    try:
-                        runtime    = row.locator("td.time-consumed-cell").inner_text().strip()
-                        memory_str = row.locator("td.memory-consumed-cell").inner_text().strip()
-                    except Exception:
-                        pass
-
-                    logger.info(
-                        "Verdict: %s | id=%s | time=%s | mem=%s",
-                        verdict, submission_id, runtime or "N/A", memory_str or "N/A",
-                    )
-                    break
-
-                except Exception as e:
-                    logger.warning("Attempt %d — error reading verdict: %s", attempt, e)
-                    time.sleep(3)
-                    page.reload()
+            # ── 7. Poll verdict via /submissions/{handle} ───────────────────
+            result = _poll_verdict(page, contest_id, index)
 
             # Persist session for next local run
             try:
@@ -426,14 +503,7 @@ def submit_solution(problem: dict, code: str) -> dict:
             except Exception:
                 pass
 
-            return {
-                "verdict":       verdict,
-                "submission_id": submission_id,
-                "url":           sub_url,
-                "accepted":      accepted,
-                "runtime":       runtime,
-                "memory":        memory_str,
-            }
+            return result
 
         finally:
             context.close()
