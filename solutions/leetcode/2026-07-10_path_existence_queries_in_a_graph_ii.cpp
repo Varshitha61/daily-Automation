@@ -8,70 +8,92 @@ using namespace std;
 
 class Solution {
 public:
-    vector<int> shortestDistance(vector<int>& nums, int maxDiff, vector<vector<int>>& queries) {
-        int n = nums.size();
+    vector<int> distance(vector<vector<int>>& queries, int n, vector<int>& nums, int maxDiff) {
         vector<int> result;
+        unordered_map<int, vector<int>> graph;
+        
+        for (int i = 0; i < n; i++) {
+            for (int j = i + 1; j < n; j++) {
+                if (abs(nums[i] - nums[j]) <= maxDiff) {
+                    graph[i].push_back(j);
+                    graph[j].push_back(i);
+                }
+            }
+        }
+        
         for (auto& query : queries) {
             int u = query[0], v = query[1];
             if (u == v) {
                 result.push_back(0);
                 continue;
             }
-            unordered_map<int, vector<int>> graph;
-            for (int i = 0; i < n; i++) {
-                for (int j = i + 1; j < n; j++) {
-                    if (abs(nums[i] - nums[j]) <= maxDiff) {
-                        graph[i].push_back(j);
-                        graph[j].push_back(i);
+            
+            unordered_map<int, int> distance;
+            queue<int> q;
+            q.push(u);
+            distance[u] = 0;
+            
+            while (!q.empty()) {
+                int node = q.front();
+                q.pop();
+                
+                for (int neighbor : graph[node]) {
+                    if (distance.find(neighbor) == distance.end()) {
+                        distance[neighbor] = distance[node] + 1;
+                        q.push(neighbor);
                     }
                 }
             }
-            queue<pair<int, int>> q;
-            q.push({u, 0});
-            unordered_set<int> visited;
-            bool found = false;
-            while (!q.empty()) {
-                auto [node, dist] = q.front();
-                q.pop();
-                if (node == v) {
-                    result.push_back(dist);
-                    found = true;
-                    break;
-                }
-                if (visited.find(node) != visited.end()) continue;
-                visited.insert(node);
-                for (auto& neighbor : graph[node]) {
-                    q.push({neighbor, dist + 1});
-                }
+            
+            if (distance.find(v) != distance.end()) {
+                result.push_back(distance[v]);
+            } else {
+                result.push_back(-1);
             }
-            if (!found) result.push_back(-1);
         }
+        
         return result;
     }
 };
 
 int main() {
     Solution solution;
-    vector<int> nums1 = {1, 8, 3, 4, 2};
-    int maxDiff1 = 3;
-    vector<vector<int>> queries1 = {{0, 3}, {2, 4}};
-    vector<int> result1 = solution.shortestDistance(nums1, maxDiff1, queries1);
-    for (auto& res : result1) cout << res << " ";
+    int n, maxDiff;
+    vector<int> nums;
+    vector<vector<int>> queries;
+    
+    // Test case 1
+    n = 5;
+    nums = {1, 8, 3, 4, 2};
+    maxDiff = 3;
+    queries = {{0, 3}, {2, 4}};
+    vector<int> result1 = solution.distance(queries, n, nums, maxDiff);
+    for (int i : result1) {
+        cout << i << " ";
+    }
     cout << endl;
-
-    vector<int> nums2 = {5, 3, 1, 9, 10};
-    int maxDiff2 = 2;
-    vector<vector<int>> queries2 = {{0, 1}, {0, 2}, {2, 3}, {4, 3}};
-    vector<int> result2 = solution.shortestDistance(nums2, maxDiff2, queries2);
-    for (auto& res : result2) cout << res << " ";
+    
+    // Test case 2
+    n = 5;
+    nums = {5, 3, 1, 9, 10};
+    maxDiff = 2;
+    queries = {{0, 1}, {0, 2}, {2, 3}, {4, 3}};
+    vector<int> result2 = solution.distance(queries, n, nums, maxDiff);
+    for (int i : result2) {
+        cout << i << " ";
+    }
     cout << endl;
-
-    vector<int> nums3 = {3, 6, 1};
-    int maxDiff3 = 1;
-    vector<vector<int>> queries3 = {{0, 0}, {0, 1}, {1, 2}};
-    vector<int> result3 = solution.shortestDistance(nums3, maxDiff3, queries3);
-    for (auto& res : result3) cout << res << " ";
+    
+    // Test case 3
+    n = 3;
+    nums = {3, 6, 1};
+    maxDiff = 1;
+    queries = {{0, 0}, {0, 1}, {1, 2}};
+    vector<int> result3 = solution.distance(queries, n, nums, maxDiff);
+    for (int i : result3) {
+        cout << i << " ";
+    }
     cout << endl;
-
+    
     return 0;
 }
