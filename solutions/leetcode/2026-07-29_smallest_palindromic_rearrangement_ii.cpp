@@ -9,95 +9,72 @@ class Solution {
 public:
     string getSmallestString(string s, int k) {
         int n = s.size();
-        vector<int> count(26, 0);
+        vector<int> cnt(26, 0);
         for (char c : s) {
-            count[c - 'a']++;
+            cnt[c - 'a']++;
         }
         vector<char> firstHalf;
         vector<char> secondHalf;
-        char midChar = '\0';
+        char mid = '\0';
         for (int i = 0; i < 26; i++) {
-            if (count[i] > 0) {
-                if (count[i] % 2 == 1) {
-                    if (midChar != '\0') {
-                        return "";
-                    }
-                    midChar = 'a' + i;
+            if (cnt[i] % 2 == 1) {
+                if (mid != '\0') {
+                    return "";
                 }
-                for (int j = 0; j < count[i] / 2; j++) {
-                    firstHalf.push_back('a' + i);
-                }
+                mid = 'a' + i;
+            }
+            for (int j = 0; j < cnt[i] / 2; j++) {
+                firstHalf.push_back('a' + i);
             }
         }
         sort(firstHalf.begin(), firstHalf.end());
-        int index = 0;
-        for (int i = 0; i < firstHalf.size(); i++) {
-            if (k > 1) {
-                int j = i + 1;
-                while (j < firstHalf.size() && firstHalf[j] == firstHalf[i]) {
-                    j++;
+        int m = firstHalf.size();
+        vector<vector<int>> factorial(m + 1, vector<int>(m + 1, 0));
+        for (int i = 0; i <= m; i++) {
+            factorial[i][0] = 1;
+            factorial[i][i] = 1;
+            for (int j = 1; j < i; j++) {
+                factorial[i][j] = factorial[i - 1][j - 1] + factorial[i - 1][j];
+            }
+        }
+        vector<bool> used(m, false);
+        string result = "";
+        k--;
+        for (int i = 0; i < m; i++) {
+            for (int j = 0; j < m; j++) {
+                if (used[j]) {
+                    continue;
                 }
-                int countSame = j - i;
-                long long numPermutations = permutationCount(countSame, index);
-                if (k > numPermutations) {
-                    k -= numPermutations;
-                    index += countSame;
-                    i = j - 1;
-                } else {
+                int remaining = m - i - 1;
+                int count = 0;
+                for (int l = j + 1; l < m; l++) {
+                    if (!used[l]) {
+                        count++;
+                    }
+                }
+                if (factorial[remaining][count] > k) {
+                    result += firstHalf[j];
+                    used[j] = true;
                     break;
+                } else {
+                    k -= factorial[remaining][count];
                 }
             }
         }
-        if (k == 1) {
-            string result = "";
-            for (int i = 0; i < firstHalf.size(); i++) {
-                if (i == index) {
-                    result += firstHalf[i];
-                    i++;
-                }
-                if (i < firstHalf.size()) {
-                    result += firstHalf[i];
-                }
-            }
-            if (midChar != '\0') {
-                result += midChar;
-            }
-            for (int i = firstHalf.size() - 1; i >= 0; i--) {
-                result += firstHalf[i];
-            }
-            return result;
-        } else {
-            return "";
+        if (mid != '\0') {
+            result += mid;
         }
-    }
-
-    long long permutationCount(int countSame, int index) {
-        if (countSame == 0) {
-            return 1;
-        }
-        long long result = 1;
-        for (int i = countSame; i > 0; i--) {
-            result *= i;
-            if (index + i == countSame) {
-                result /= factorial(countSame - index);
-            }
-        }
-        return result;
-    }
-
-    long long factorial(int n) {
-        long long result = 1;
-        for (int i = 2; i <= n; i++) {
-            result *= i;
-        }
+        reverse(firstHalf.begin(), firstHalf.end());
+        result += firstHalf;
         return result;
     }
 };
 
 int main() {
     Solution solution;
-    cout << solution.getSmallestString("abba", 2) << endl;  // Output: "baab"
-    cout << solution.getSmallestString("aa", 2) << endl;    // Output: ""
-    cout << solution.getSmallestString("bacab", 1) << endl; // Output: "abcba"
+    string s;
+    int k;
+    cin >> s >> k;
+    cout << solution.getSmallestString(s, k) << endl;
     return 0;
 }
