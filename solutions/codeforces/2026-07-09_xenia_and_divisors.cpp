@@ -19,37 +19,33 @@ int main() {
     }
 
     vector<vector<int>> ans;
-    for (int i = 0; i < n / 3; i++) {
-        bool found = false;
-        for (int x = 1; x <= 7; x++) {
-            if (cnt[x] > 0) {
-                for (int y = x + 1; y <= 7; y++) {
-                    if (cnt[y] > 0 && y % x == 0) {
-                        for (int z = y + 1; z <= 7; z++) {
-                            if (cnt[z] > 0 && z % y == 0) {
-                                ans.push_back({x, y, z});
-                                cnt[x]--;
-                                cnt[y]--;
-                                cnt[z]--;
-                                found = true;
-                                break;
-                            }
+    for (int i = 1; i <= 7; i++) {
+        for (int j = i + 1; j <= 7; j++) {
+            if (j % i == 0) {
+                for (int k = j + 1; k <= 7; k++) {
+                    if (k % j == 0) {
+                        while (cnt[i] > 0 && cnt[j] > 0 && cnt[k] > 0) {
+                            vector<int> tmp = {i, j, k};
+                            ans.push_back(tmp);
+                            cnt[i]--;
+                            cnt[j]--;
+                            cnt[k]--;
                         }
-                        if (found) break;
                     }
                 }
-                if (found) break;
             }
-        }
-        if (!found) {
-            cout << -1 << endl;
-            return 0;
         }
     }
 
-    for (int i = 0; i < ans.size(); i++) {
-        cout << ans[i][0] << " " << ans[i][1] << " " << ans[i][2];
-        if (i < ans.size() - 1) cout << endl;
+    if (ans.size() == n / 3) {
+        for (int i = 0; i < ans.size(); i++) {
+            for (int j = 0; j < ans[i].size(); j++) {
+                cout << ans[i][j] << " ";
+            }
+            cout << endl;
+        }
+    } else {
+        cout << -1 << endl;
     }
 
     return 0;

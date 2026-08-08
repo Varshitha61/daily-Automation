@@ -15,13 +15,8 @@ int main() {
     for (int i = 0; i < n; i++) {
         if (a[i].first > a[i].second) {
             if (a[i].first - a[i].second > diff) {
-                ans = i + 1;
                 diff = a[i].first - a[i].second;
-            }
-        } else {
-            if (a[i].second - a[i].first > diff) {
                 ans = i + 1;
-                diff = a[i].second - a[i].first;
             }
         }
     }
