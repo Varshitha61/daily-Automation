@@ -66,9 +66,10 @@ _LANG_MAP = {
 # ---------------------------------------------------------------------------
 
 def _launch_browser(p) -> Browser:
-    """Chromium with stealth-friendly flags suitable for CI."""
+    """Chromium with stealth-friendly flags. Runs non-headless locally to bypass Cloudflare."""
+    is_ci = os.getenv("GITHUB_ACTIONS") == "true" or os.getenv("CI") == "true"
     return p.chromium.launch(
-        headless=True,
+        headless=is_ci,
         args=[
             "--disable-blink-features=AutomationControlled",
             "--no-sandbox",
@@ -99,6 +100,48 @@ def _build_context(browser: Browser) -> BrowserContext:
         viewport={"width": 1280, "height": 800},
         locale="en-US",
     )
+
+    # Priority 0.5: Direct env cookies
+    cf_39ce7 = Config.CODEFORCES_39CE7.strip()
+    cf_jsessionid = Config.CODEFORCES_JSESSIONID.strip()
+    cf_xuser = Config.CODEFORCES_X_USER_SHA1.strip()
+    if cf_39ce7:
+        logger.info("Building Codeforces context using direct cookies from .env variables.")
+        context = browser.new_context(**base_kwargs)
+        cookies = [
+            {
+                "name": "39ce7",
+                "value": cf_39ce7,
+                "domain": ".codeforces.com",
+                "path": "/",
+                "httpOnly": True,
+                "secure": True,
+                "sameSite": "Lax"
+            }
+        ]
+        if cf_jsessionid:
+            cookies.append({
+                "name": "JSESSIONID",
+                "value": cf_jsessionid,
+                "domain": "codeforces.com",
+                "path": "/",
+                "httpOnly": True,
+                "secure": True,
+                "sameSite": "Lax"
+            })
+        if cf_xuser:
+            cookies.append({
+                "name": "X-User-Sha1",
+                "value": cf_xuser,
+                "domain": ".codeforces.com",
+                "path": "/",
+                "httpOnly": False,
+                "secure": True,
+                "sameSite": "Lax"
+            })
+        context.add_cookies(cookies)
+        return context
+
 
     # Priority 1: GitHub secret
     raw = os.getenv("CF_COOKIES_JSON", "").strip()
@@ -178,19 +221,31 @@ def _form_login(page: Page) -> None:
         return
 
     # Check for Cloudflare block
-    if "Just a moment" in (page.title() or ""):
+    page_title = page.title() or ""
+    page_html = page.content().lower()
+    if "Just a moment" in page_title or "cloudflare" in page_html or "challenge" in page_html:
         raise RuntimeError(
             "Cloudflare is blocking the headless browser on the Codeforces login page. "
-            "Set the CF_COOKIES_JSON GitHub secret with your exported browser cookies. "
-            "Run: python export_cf_cookies.py  to generate the JSON."
+            "Your cookies in logs/codeforces_session.json have expired or are missing.\n"
+            "Please run: python export_cf_cookies.py\n"
+            "in your terminal to export fresh cookies from your browser."
         )
 
     try:
         page.wait_for_selector("input#handleOrEmail", timeout=15_000)
     except PWTimeout:
+        current_title = page.title() or ""
+        current_html = page.content().lower()
+        if "cloudflare" in current_html or "challenge" in current_html or "Just a moment" in current_title:
+            raise RuntimeError(
+                "Cloudflare is blocking the headless browser on the Codeforces login page. "
+                "Your cookies in logs/codeforces_session.json have expired or are missing.\n"
+                "Please run: python export_cf_cookies.py\n"
+                "in your terminal to export fresh cookies from your browser."
+            )
         snippet = page.content()[:400]
         raise RuntimeError(
-            f"Login form not found. URL={page.url}  snippet={snippet}"
+            f"Login form not found (possibly Cloudflare block or UI change). URL={page.url}  snippet={snippet}"
         )
 
     page.fill("input#handleOrEmail", Config.CODEFORCES_HANDLE)

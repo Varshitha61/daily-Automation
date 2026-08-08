@@ -46,14 +46,21 @@ _MAX_POLL_ATTEMPTS = 20
 _POLL_INTERVAL_SEC = 3
 
 
-def _build_session() -> requests.Session:
+def _build_session(platform: str = "leetcode") -> requests.Session:
     """Return an authenticated requests.Session for LeetCode."""
     session = requests.Session()
-    session.cookies.set("LEETCODE_SESSION",  Config.LEETCODE_SESSION,  domain="leetcode.com")
-    session.cookies.set("csrftoken",         Config.LEETCODE_CSRF_TOKEN, domain="leetcode.com")
+    if platform == "leetcode_2":
+        session_cookie = Config.LEETCODE_2_SESSION
+        csrf_token = Config.LEETCODE_2_CSRF_TOKEN
+    else:
+        session_cookie = Config.LEETCODE_SESSION
+        csrf_token = Config.LEETCODE_CSRF_TOKEN
+
+    session.cookies.set("LEETCODE_SESSION",  session_cookie,  domain="leetcode.com")
+    session.cookies.set("csrftoken",         csrf_token, domain="leetcode.com")
     session.headers.update({
         "Content-Type":  "application/json",
-        "X-CSRFToken":   Config.LEETCODE_CSRF_TOKEN,
+        "X-CSRFToken":   csrf_token,
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -62,6 +69,7 @@ def _build_session() -> requests.Session:
         "Referer": "https://leetcode.com",
     })
     return session
+
 
 
 def submit_solution(problem: dict, code: str) -> dict:
@@ -104,7 +112,9 @@ def submit_solution(problem: dict, code: str) -> dict:
     # especially during retries
     time.sleep(10)
 
-    session = _build_session()
+    platform = problem.get("platform", "leetcode")
+    session = _build_session(platform)
+
 
     # ── Step 1: POST the submission ──────────────────────────────────────────
     submit_url = _SUBMIT_URL.format(slug=slug)

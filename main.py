@@ -38,6 +38,7 @@ import platforms.leetcode as lc_fetcher
 import platforms.codeforces as cf_fetcher
 import platforms.codechef as cc_fetcher
 import platforms.hackerrank as hr_fetcher
+import platforms.atcoder as at_fetcher
 
 from solver.groq_solver import solve_problem
 
@@ -45,13 +46,17 @@ import platforms.submitters.leetcode_submit as lc_submit
 import platforms.submitters.codeforces_submit as cf_submit
 import platforms.submitters.codechef_submit as cc_submit
 import platforms.submitters.hackerrank_submit as hr_submit
+import platforms.submitters.atcoder_submit as at_submit
 
 _SUBMITTERS = {
     "leetcode": lc_submit.submit_solution,
+    "leetcode_2": lc_submit.submit_solution,
     "codeforces": cf_submit.submit_solution,
     "codechef": cc_submit.submit_solution,
     "hackerrank": hr_submit.submit_solution,
+    "atcoder": at_submit.submit_solution,
 }
+
 
 # ---------------------------------------------------------------------------
 # Logging setup
@@ -259,6 +264,7 @@ async def _run_platform(platform_name: str, fetch_fn) -> bool:
                 problem["description"] += f"\n\nNOTE: A previous attempt in {solved['language']} failed with verdict: {verdict_info.get('verdict')}. Please provide a fixed, correct solution."
             except Exception as e:
                 logger.warning("[%s] Submission error: %s", platform_name, e)
+                verdict_info = {"accepted": False, "verdict": f"Submission Error: {e}"}
                 break
 
         # Step 3 — Save solution to disk + DB (blocking file I/O → thread)
@@ -269,6 +275,11 @@ async def _run_platform(platform_name: str, fetch_fn) -> bool:
             solved["submission_id"] = verdict_info.get("submission_id")
             
         file_path: str = await asyncio.to_thread(save_solution, solved)
+
+        if submit_fn:
+            if not verdict_info or not verdict_info.get("accepted"):
+                verdict = verdict_info.get("verdict", "No verdict returned") if verdict_info else "Submission failed"
+                raise RuntimeError(f"Submission to {platform_name.upper()} failed: {verdict}")
 
         # Step 4 — Telegram success notification
         notify_kwargs = {
@@ -346,10 +357,12 @@ async def run_daily_bot() -> None:
 
     # Platform registry — (name, fetch_function) pairs
     platforms: list[tuple[str, object]] = [
-        ("leetcode",   lc_fetcher.fetch_daily_problem),
+        ("leetcode",   lambda: lc_fetcher.fetch_daily_problem("leetcode")),
+        ("leetcode_2", lambda: lc_fetcher.fetch_daily_problem("leetcode_2")),
         ("codeforces", cf_fetcher.fetch_daily_problem),
         ("codechef",   cc_fetcher.fetch_daily_problem),
         ("hackerrank", hr_fetcher.fetch_daily_problem),
+        ("atcoder",    at_fetcher.fetch_daily_problem),
     ]
 
     succeeded: list[str] = []
@@ -359,24 +372,24 @@ async def run_daily_bot() -> None:
     for platform_name, fetch_fn in platforms:
         # LeetCode requires fresh browser cookies that expire regularly.
         # Skip gracefully instead of failing with a cryptic 403 error.
-        if platform_name == "leetcode" and not Config.has_leetcode_credentials():
+        if platform_name.startswith("leetcode") and not Config.has_leetcode_credentials(platform_name):
             logger.warning(
-                "[LEETCODE] Skipping — LEETCODE_SESSION / LEETCODE_CSRF_TOKEN "
-                "are not set or have expired. Update the GitHub secret with "
-                "fresh cookies from your browser."
+                "[%s] Skipping — credentials for %s are not set or have expired.",
+                platform_name.upper(), platform_name
             )
             try:
                 await asyncio.to_thread(
                     telegram.send_error_notification,
-                    "leetcode",
-                    "Skipped: LEETCODE_SESSION / LEETCODE_CSRF_TOKEN are missing or expired. "
+                    platform_name,
+                    f"Skipped: Credentials for {platform_name} are missing or expired. "
                     "Log into leetcode.com in your browser, copy the fresh cookies, "
-                    "and update the GitHub Actions secrets.",
+                    "and update the environment variables.",
                 )
             except Exception:
                 pass
             failed.append(platform_name)
             continue
+
 
         ok: bool = await _run_platform(platform_name, fetch_fn)
         if ok:

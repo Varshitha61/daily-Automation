@@ -15,8 +15,8 @@ the solution code — all with zero human interaction after first-time setup.
 ```bash
 git clone https://github.com/your-username/daily-coding-bot.git
 cd daily-coding-bot
-```
-
+```    
+ 
 **2. Install Python dependencies**
 ```bash
 pip install -r requirements.txt

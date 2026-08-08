@@ -69,26 +69,33 @@ query getProblemDetail($titleSlug: String!) {
 """
 
 
-def _build_session() -> requests.Session:
+def _build_session(platform: str = "leetcode") -> requests.Session:
     """
     Build and return a requests.Session pre-configured with the LeetCode
     authentication cookies and required headers.
 
-    The LEETCODE_SESSION and LEETCODE_CSRF_TOKEN values are read from Config
-    and injected as cookies and the X-CSRFToken header respectively.
+    The LEETCODE_SESSION and LEETCODE_CSRF_TOKEN values (or their _2 variants)
+    are read from Config and injected as cookies and the X-CSRFToken header respectively.
 
     Returns:
         requests.Session: A fully configured session ready to call the
                           LeetCode GraphQL endpoint.
     """
     session = requests.Session()
-    session.cookies.set("LEETCODE_SESSION", Config.LEETCODE_SESSION, domain="leetcode.com")
-    session.cookies.set("csrftoken", Config.LEETCODE_CSRF_TOKEN, domain="leetcode.com")
+    if platform == "leetcode_2":
+        session_cookie = Config.LEETCODE_2_SESSION
+        csrf_token = Config.LEETCODE_2_CSRF_TOKEN
+    else:
+        session_cookie = Config.LEETCODE_SESSION
+        csrf_token = Config.LEETCODE_CSRF_TOKEN
+
+    session.cookies.set("LEETCODE_SESSION", session_cookie, domain="leetcode.com")
+    session.cookies.set("csrftoken", csrf_token, domain="leetcode.com")
     session.headers.update(
         {
             "Content-Type": "application/json",
             "Referer": "https://leetcode.com",
-            "X-CSRFToken": Config.LEETCODE_CSRF_TOKEN,
+            "X-CSRFToken": csrf_token,
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -97,6 +104,7 @@ def _build_session() -> requests.Session:
         }
     )
     return session
+
 
 
 def _graphql_post(
@@ -206,7 +214,7 @@ def _html_to_plain_text(html_content: str) -> str:
     return text.strip()
 
 
-def fetch_daily_problem() -> dict:
+def fetch_daily_problem(platform: str = "leetcode") -> dict:
     """
     Fetch today's LeetCode Daily Coding Challenge question via the GraphQL API.
 
@@ -221,7 +229,7 @@ def fetch_daily_problem() -> dict:
             - difficulty  (str)  : "Easy" | "Medium" | "Hard"
             - description (str)  : Full problem statement as plain text
             - url         (str)  : Direct URL to the problem on LeetCode
-            - platform    (str)  : Always "leetcode"
+            - platform    (str)  : Normalised platform name (e.g. 'leetcode' or 'leetcode_2')
             - question_id (str)  : Numeric question ID as a string
             - examples    (str)  : Raw example test cases string
 
@@ -230,9 +238,10 @@ def fetch_daily_problem() -> dict:
                       in the response.
         KeyError:     If the response JSON structure is unexpected.
     """
-    logger.info("Fetching LeetCode daily problem…")
-    session = _build_session()
+    logger.info("Fetching LeetCode daily problem for %s…", platform)
+    session = _build_session(platform)
     data = _graphql_post(session, _DAILY_CHALLENGE_QUERY)
+
 
     try:
         challenge = data["data"]["activeDailyCodingChallengeQuestion"]
@@ -277,10 +286,11 @@ def fetch_daily_problem() -> dict:
         "difficulty": difficulty,
         "description": description,
         "url": problem_url,
-        "platform": "leetcode",
+        "platform": platform,
         "question_id": question_id,
         "examples": examples,
     }
+
 
 
 def fetch_problem_details(slug: str) -> str:

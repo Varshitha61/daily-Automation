@@ -45,6 +45,9 @@ class Config:
     # ------------------------------------------------------------------
     LEETCODE_SESSION: str = os.getenv("LEETCODE_SESSION", "")
     LEETCODE_CSRF_TOKEN: str = os.getenv("LEETCODE_CSRF_TOKEN", "")
+    LEETCODE_2_SESSION: str = os.getenv("LEETCODE_2_SESSION", "")
+    LEETCODE_2_CSRF_TOKEN: str = os.getenv("LEETCODE_2_CSRF_TOKEN", "")
+
 
     # ------------------------------------------------------------------
     # Codeforces
@@ -53,6 +56,9 @@ class Config:
     CODEFORCES_API_SECRET: str = os.getenv("CODEFORCES_API_SECRET", "")
     CODEFORCES_HANDLE: str = os.getenv("CODEFORCES_HANDLE", "")
     CODEFORCES_PASSWORD: str = os.getenv("CODEFORCES_PASSWORD", "")
+    CODEFORCES_39CE7: str = os.getenv("CODEFORCES_39CE7", "")
+    CODEFORCES_JSESSIONID: str = os.getenv("CODEFORCES_JSESSIONID", "")
+    CODEFORCES_X_USER_SHA1: str = os.getenv("CODEFORCES_X_USER_SHA1", "")
 
     # ------------------------------------------------------------------
     # CodeChef
@@ -65,6 +71,13 @@ class Config:
     # ------------------------------------------------------------------
     HACKERRANK_USERNAME: str = os.getenv("HACKERRANK_USERNAME", "")
     HACKERRANK_PASSWORD: str = os.getenv("HACKERRANK_PASSWORD", "")
+
+    # ------------------------------------------------------------------
+    # AtCoder
+    # ------------------------------------------------------------------
+    ATCODER_USERNAME: str = os.getenv("ATCODER_USERNAME", "")
+    ATCODER_PASSWORD: str = os.getenv("ATCODER_PASSWORD", "")
+
 
     # ------------------------------------------------------------------
     # Bot behaviour settings
@@ -101,7 +114,10 @@ class Config:
         "CODECHEF_PASSWORD",
         "HACKERRANK_USERNAME",
         "HACKERRANK_PASSWORD",
+        "ATCODER_USERNAME",
+        "ATCODER_PASSWORD",
     ]
+
 
     @classmethod
     def validate(cls) -> None:
@@ -144,21 +160,31 @@ class Config:
             )
 
     @classmethod
-    def has_leetcode_credentials(cls) -> bool:
+    def has_leetcode_credentials(cls, platform: str = "leetcode") -> bool:
         """
-        Return True only when both LeetCode auth cookies are non-empty.
+        Return True only when both LeetCode auth cookies for the specified
+        account are non-empty.
 
         LeetCode session cookies expire frequently.  Callers should use this
         helper to decide whether to attempt the LeetCode pipeline rather than
         letting it fail deep inside the fetcher or submitter.
 
+        Args:
+            platform (str): The platform/account identifier. Can be 'leetcode' or 'leetcode_2'.
+
         Returns:
-            bool: True if LEETCODE_SESSION and LEETCODE_CSRF_TOKEN are set.
+            bool: True if correct cookies are set.
         """
+        if platform == "leetcode_2":
+            return bool(
+                cls.LEETCODE_2_SESSION and cls.LEETCODE_2_SESSION.strip()
+                and cls.LEETCODE_2_CSRF_TOKEN and cls.LEETCODE_2_CSRF_TOKEN.strip()
+            )
         return bool(
             cls.LEETCODE_SESSION and cls.LEETCODE_SESSION.strip()
             and cls.LEETCODE_CSRF_TOKEN and cls.LEETCODE_CSRF_TOKEN.strip()
         )
+
 
     @classmethod
     def get_run_hour_minute(cls) -> tuple[int, int]:
