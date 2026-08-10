@@ -1,35 +1,32 @@
 #include <iostream>
 #include <vector>
 #include <algorithm>
+#include <climits>
 
 using namespace std;
 
-const int MAXN = 2005;
-
-int n, k;
-int a[MAXN];
-int dp[MAXN][MAXN];
-int pre[MAXN][MAXN];
-int ans[MAXN];
-
 int main() {
+    int n, k;
     cin >> n >> k;
-    for (int i = 1; i <= n; i++) {
+
+    vector<int> a(n);
+    for (int i = 0; i < n; i++) {
         cin >> a[i];
     }
 
-    for (int i = 1; i <= n; i++) {
-        dp[i][1] = *max_element(a + 1, a + i + 1);
-    }
+    vector<vector<int>> dp(n + 1, vector<int>(k + 1, INT_MIN));
+    vector<vector<int>> prev(n + 1, vector<int>(k + 1, -1));
 
-    for (int j = 2; j <= k; j++) {
-        for (int i = j; i <= n; i++) {
-            dp[i][j] = -1;
-            for (int l = j - 1; l < i; l++) {
-                int val = dp[l][j - 1] + *max_element(a + l + 1, a + i + 1);
-                if (val > dp[i][j]) {
-                    dp[i][j] = val;
-                    pre[i][j] = l;
+    dp[0][0] = 0;
+
+    for (int i = 1; i <= n; i++) {
+        for (int j = 1; j <= min(i, k); j++) {
+            int max_val = 0;
+            for (int l = i - 1; l >= 0; l--) {
+                max_val = max(max_val, a[l]);
+                if (dp[l][j - 1] != INT_MIN && dp[l][j - 1] + max_val > dp[i][j]) {
+                    dp[i][j] = dp[l][j - 1] + max_val;
+                    prev[i][j] = l;
                 }
             }
         }
@@ -37,14 +34,18 @@ int main() {
 
     cout << dp[n][k] << endl;
 
-    int idx = n;
-    for (int i = k; i >= 1; i--) {
-        ans[i] = idx - pre[idx][i];
-        idx = pre[idx][i];
+    vector<int> ans;
+    int i = n, j = k;
+    while (j > 0) {
+        ans.push_back(i - prev[i][j]);
+        i = prev[i][j];
+        j--;
     }
 
-    for (int i = 1; i <= k; i++) {
-        cout << ans[i] << " ";
+    reverse(ans.begin(), ans.end());
+
+    for (int x : ans) {
+        cout << x << " ";
     }
 
     return 0;
