@@ -168,6 +168,9 @@ def submit_solution(problem: dict, code: str) -> dict:
             page.goto(_BASE_URL, timeout=_WAIT_MS, wait_until="domcontentloaded")
             time.sleep(2)
 
+            if not _is_logged_in(page):
+                raise RuntimeError("Your CodeChef cookies (CODECHEF_AUTH_TOKEN, etc.) have expired. Please log into codechef.com, copy the new cookies, and update your GitHub Actions Secrets.")
+
             # ── 2. Navigate to the problem page ────────────────────────────
             page.goto(url, timeout=_WAIT_MS, wait_until="domcontentloaded")
             time.sleep(3)

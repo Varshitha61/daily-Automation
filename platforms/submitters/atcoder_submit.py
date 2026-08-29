@@ -213,11 +213,14 @@ def submit_solution(problem: dict, code: str) -> dict:
             # If redirected to login again, log in
             if "login" in page.url:
                 logger.warning("AtCoder session invalid on submit page. Logging in again...")
-                _login(page)
-                page.goto(submit_url, timeout=_WAIT_MS, wait_until="domcontentloaded")
-                time.sleep(3)
+            # Navigate directly to home to verify cookies work
+            page.goto(_BASE_URL, timeout=_WAIT_MS, wait_until="domcontentloaded")
+            time.sleep(2)
+            
+            if not _is_logged_in(page):
+                raise RuntimeError("Your ATCODER_SESSION cookie has expired. Please log into atcoder.jp, copy the new REVEL_SESSION cookie, and update your GitHub Actions Secrets.")
 
-            # ── 3. Select Task ───────────────────────────────────────────────
+            # ── 2. Navigate to the problem page ───────────────────────────────────────────────
             try:
                 page.wait_for_selector("select[name='data.TaskScreenName']", timeout=15000)
                 # Find task value by matching substring
