@@ -225,10 +225,9 @@ def _form_login(page: Page) -> None:
     page_html = page.content().lower()
     if "Just a moment" in page_title or "cloudflare" in page_html or "challenge" in page_html:
         raise RuntimeError(
-            "Cloudflare is blocking the headless browser on the Codeforces login page. "
-            "Your cookies in logs/codeforces_session.json have expired or are missing.\n"
-            "Please run: python export_cf_cookies.py\n"
-            "in your terminal to export fresh cookies from your browser."
+            "Cloudflare is blocking Codeforces login. "
+            "Your Codeforces cookies (CODEFORCES_39CE7, CODEFORCES_JSESSIONID) have expired. "
+            "Please log into Codeforces in your browser, copy the new cookies, and update your GitHub Actions Secrets."
         )
 
     try:
@@ -238,10 +237,9 @@ def _form_login(page: Page) -> None:
         current_html = page.content().lower()
         if "cloudflare" in current_html or "challenge" in current_html or "Just a moment" in current_title:
             raise RuntimeError(
-                "Cloudflare is blocking the headless browser on the Codeforces login page. "
-                "Your cookies in logs/codeforces_session.json have expired or are missing.\n"
-                "Please run: python export_cf_cookies.py\n"
-                "in your terminal to export fresh cookies from your browser."
+                "Cloudflare is blocking Codeforces login. "
+                "Your Codeforces cookies (CODEFORCES_39CE7, CODEFORCES_JSESSIONID) have expired. "
+                "Please log into Codeforces in your browser, copy the new cookies, and update your GitHub Actions Secrets."
             )
         snippet = page.content()[:400]
         raise RuntimeError(
