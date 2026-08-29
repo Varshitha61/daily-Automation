@@ -20,6 +20,7 @@ Usage:
 
 import json
 import logging
+import random
 from pathlib import Path
 from typing import Optional
 
@@ -353,15 +354,25 @@ def fetch_daily_problem() -> dict:
                     href = link_el.get_attribute("href")
                     problem_link = href if href.startswith("http") else f"{_BASE_URL}{href}"
 
-            # Fallback: grab the first problem link visible on the practice page
+            # Fallback: grab all problem links visible on the practice page
             if not problem_link:
                 logger.warning(
-                    "Daily Practice section not found — falling back to first "
-                    "problem link on the practice page."
+                    "Daily Practice section not found — picking a random "
+                    "problem link from the practice page."
                 )
-                fallback_el = page.query_selector("a[href*='/problems/']")
-                if fallback_el:
-                    href = fallback_el.get_attribute("href") or ""
+                # query_selector_all gets all matching elements
+                fallback_els = page.query_selector_all("a[href*='/problems/']")
+                
+                # Filter out discussion/editorial links, keep only direct problem links
+                valid_links = []
+                for el in fallback_els:
+                    href = el.get_attribute("href")
+                    if href and "/problems/" in href and "/viewsolution" not in href and "discuss" not in href:
+                        valid_links.append(href)
+                
+                if valid_links:
+                    # Pick a random problem so it's a new one each day
+                    href = random.choice(valid_links)
                     problem_link = href if href.startswith("http") else f"{_BASE_URL}{href}"
 
             if not problem_link:
