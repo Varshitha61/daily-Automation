@@ -1,7 +1,7 @@
 """
 solver/groq_solver.py — AI solution generator using Groq API (FREE tier).
 
-Uses the Groq SDK to call LLaMA 3.3 70B — completely free with 6,000
+Uses the Groq SDK to call Qwen3.8-27B — completely free with 6,000
 requests/day. No projects or billing needed.
 
 Free API key at: https://console.groq.com/keys
@@ -25,8 +25,9 @@ from config import Config
 
 logger = logging.getLogger(__name__)
 
-# LLaMA 3.3 70B is free, fast, and excellent at competitive programming.
-_MODEL_NAME: str = "llama-3.3-70b-versatile"
+# openai/gpt-oss-120b is the largest model available on Groq — best for competitive programming.
+# Updated from qwen/qwen3.8-27b which had compile errors on complex C++ problems.
+_MODEL_NAME: str = "openai/gpt-oss-120b"
 
 # Seconds to wait before retrying a failed call.
 _RETRY_WAIT: int = 10
@@ -73,7 +74,7 @@ def _build_user_message(problem: dict) -> str:
 
 def solve_problem(problem: dict) -> dict:
     """
-    Generate a complete code solution using Groq (LLaMA 3.3 70B) — free tier.
+    Generate a complete code solution using Groq (gpt-oss-120b) — free tier.
 
     Args:
         problem (dict): Problem dictionary from any platform fetcher.

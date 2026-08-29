@@ -221,9 +221,12 @@ def submit_solution(problem: dict, code: str) -> dict:
             accepted = False
 
             try:
+                # Expanded selectors based on known HackerRank classes
                 status_locator = page.locator(
                     ".test-case-status, .compiler-message, .status-title, "
-                    "[class*='verdict'], [class*='result-txt']"
+                    "[class*='verdict'], [class*='result-txt'], "
+                    ".success-msg, .error-msg, .compile-error, "
+                    ".hr-dialog-content, .status"
                 )
                 status_locator.first.wait_for(timeout=45_000)
                 verdict = status_locator.first.inner_text().strip()
@@ -235,6 +238,8 @@ def submit_solution(problem: dict, code: str) -> dict:
                 logger.info("HackerRank verdict: %s", verdict)
             except PWTimeout:
                 logger.warning("Timed out waiting for verdict on HackerRank.")
+                page.screenshot(path="logs/hackerrank_timeout.png")
+                logger.info("Saved timeout screenshot to logs/hackerrank_timeout.png")
                 verdict = "Unknown Verdict (Timed Out)"
 
             _save_session(page)

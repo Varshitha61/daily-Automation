@@ -61,10 +61,13 @@ class Config:
     CODEFORCES_X_USER_SHA1: str = os.getenv("CODEFORCES_X_USER_SHA1", "")
 
     # ------------------------------------------------------------------
-    # CodeChef
+    # CodeChef — cookie-based auth (no login needed)
     # ------------------------------------------------------------------
-    CODECHEF_USERNAME: str = os.getenv("CODECHEF_USERNAME", "")
-    CODECHEF_PASSWORD: str = os.getenv("CODECHEF_PASSWORD", "")
+    CODECHEF_AUTH_TOKEN:   str = os.getenv("CODECHEF_AUTH_TOKEN", "")
+    CODECHEF_SESSION:      str = os.getenv("CODECHEF_SESSION", "")
+    CODECHEF_CF_CLEARANCE: str = os.getenv("CODECHEF_CF_CLEARANCE", "")
+    CODECHEF_UID:          str = os.getenv("CODECHEF_UID", "")
+    CODECHEF_USERKEY:      str = os.getenv("CODECHEF_USERKEY", "")
 
     # ------------------------------------------------------------------
     # HackerRank
@@ -77,6 +80,7 @@ class Config:
     # ------------------------------------------------------------------
     ATCODER_USERNAME: str = os.getenv("ATCODER_USERNAME", "")
     ATCODER_PASSWORD: str = os.getenv("ATCODER_PASSWORD", "")
+    ATCODER_SESSION:  str = os.getenv("ATCODER_SESSION", "")
 
 
     # ------------------------------------------------------------------
@@ -92,7 +96,7 @@ class Config:
     REQUEST_TIMEOUT: int = 30        # seconds for every outbound HTTP call
     RETRY_ATTEMPTS: int = 3          # number of retries for transient errors
     RETRY_DELAY: int = 5             # seconds between retries
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
 
     # ------------------------------------------------------------------
     # Required keys — the validate() method checks all of these.
@@ -110,8 +114,8 @@ class Config:
         "CODEFORCES_HANDLE",
         # CODEFORCES_PASSWORD is optional — only needed for browser-based submission,
         # not for problem fetching via the Codeforces API.
-        "CODECHEF_USERNAME",
-        "CODECHEF_PASSWORD",
+        "CODECHEF_AUTH_TOKEN",
+        "CODECHEF_SESSION",
         "HACKERRANK_USERNAME",
         "HACKERRANK_PASSWORD",
         "ATCODER_USERNAME",

@@ -23,6 +23,7 @@ from playwright.sync_api import (
 )
 
 from config import Config
+from platforms.codechef import _build_session_from_env, _STORAGE_STATE_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +146,9 @@ def submit_solution(problem: dict, code: str) -> dict:
 
     logger.info("Submitting CodeChef solution to %s", url)
 
+    # Rebuild session from .env cookies before submitting
+    _build_session_from_env()
+
     with sync_playwright() as p:
         browser = p.chromium.launch(
             headless=True,
@@ -160,15 +164,9 @@ def submit_solution(problem: dict, code: str) -> dict:
         page = context.new_page()
 
         try:
-            # ── 1. Navigate to home to check session validity ──────────────
+            # Navigate directly to home to verify cookies work
             page.goto(_BASE_URL, timeout=_WAIT_MS, wait_until="domcontentloaded")
             time.sleep(2)
-
-            if not _is_logged_in(page):
-                _login(page)
-                _save_session(page)
-            else:
-                logger.info("CodeChef: session is valid.")
 
             # ── 2. Navigate to the problem page ────────────────────────────
             page.goto(url, timeout=_WAIT_MS, wait_until="domcontentloaded")

@@ -2,13 +2,15 @@
 platforms/codechef.py — CodeChef daily problem fetcher using Playwright.
 
 CodeChef has no public API, so this module uses a headless Chromium browser
-(via Playwright) to log in and navigate the practice section.  A persistent
-browser context is used so the login session cookie is reused between runs
-within the same process.
+(via Playwright) to navigate the practice section. Authentication is done
+via browser cookies stored in .env — no login form needed.
 
 Credentials required in .env:
-    CODECHEF_USERNAME — your CodeChef login username or email
-    CODECHEF_PASSWORD — your CodeChef login password
+    CODECHEF_AUTH_TOKEN   — value of the 'Authorization' cookie (JWT)
+    CODECHEF_SESSION      — value of the 'SESS93b6022d...' session cookie
+    CODECHEF_CF_CLEARANCE — value of the 'cf_clearance' Cloudflare cookie
+    CODECHEF_UID          — value of the 'uid' cookie
+    CODECHEF_USERKEY      — value of the 'userkey' cookie
 
 Usage:
     from platforms.codechef import fetch_daily_problem
@@ -16,8 +18,8 @@ Usage:
     # problem → { title, url, difficulty, description, platform }
 """
 
+import json
 import logging
-import os
 from pathlib import Path
 from typing import Optional
 
@@ -50,33 +52,72 @@ _WAIT_MS: int = 45_000
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _save_storage_state(context: BrowserContext) -> None:
+def _build_session_from_env() -> None:
     """
-    Persist the browser context's cookies and local storage to disk.
-
-    This allows the bot to reuse an existing authenticated session on the
-    next run without logging in again, reducing load on CodeChef's login
-    endpoint and avoiding rate-limiting.
-
-    Args:
-        context (BrowserContext): The Playwright browser context to snapshot.
+    Build the Playwright storage state JSON from CodeChef cookie values
+    stored in .env / Config. Called automatically before each run so the
+    session file is always up-to-date with the latest .env values.
     """
+    if not Config.CODECHEF_AUTH_TOKEN:
+        logger.warning("CODECHEF_AUTH_TOKEN not set — CodeChef may not authenticate.")
+        return
+
+    cookies = [
+        {
+            "name": "Authorization",
+            "value": Config.CODECHEF_AUTH_TOKEN,
+            "domain": "www.codechef.com", "path": "/",
+            "expires": 1758226976.0,
+            "httpOnly": True, "secure": True, "sameSite": "Lax",
+        },
+        {
+            "name": "SESS93b6022d778ee317bf48f7dbffe03173",
+            "value": Config.CODECHEF_SESSION,
+            "domain": ".codechef.com", "path": "/",
+            "expires": 1758226976.0,
+            "httpOnly": True, "secure": True, "sameSite": "Lax",
+        },
+        {
+            "name": "cf_clearance",
+            "value": Config.CODECHEF_CF_CLEARANCE,
+            "domain": ".codechef.com", "path": "/",
+            "expires": 1817121494.0,
+            "httpOnly": True, "secure": True, "sameSite": "None",
+        },
+        {
+            "name": "uid",
+            "value": Config.CODECHEF_UID,
+            "domain": "www.codechef.com", "path": "/",
+            "expires": 1758226976.0,
+            "httpOnly": False, "secure": False, "sameSite": "Lax",
+        },
+        {
+            "name": "userkey",
+            "value": Config.CODECHEF_USERKEY,
+            "domain": "www.codechef.com", "path": "/",
+            "expires": 1756518000.0,
+            "httpOnly": False, "secure": False, "sameSite": "Lax",
+        },
+    ]
+    # Filter out empty cookies
+    cookies = [c for c in cookies if c["value"]]
+
+    state = {"cookies": cookies, "origins": []}
     _STORAGE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    context.storage_state(path=str(_STORAGE_STATE_PATH))
-    logger.debug("CodeChef session state saved to %s", _STORAGE_STATE_PATH)
+    _STORAGE_STATE_PATH.write_text(json.dumps(state, indent=2))
+    logger.info("CodeChef session built from .env (%d cookies)", len(cookies))
 
 
 def _build_context(browser: Browser) -> BrowserContext:
     """
-    Create a Playwright BrowserContext, loading any previously saved session
-    state from disk if it exists.
+    Create a Playwright BrowserContext loaded with cookies from the
+    session file (which is auto-built from .env values).
 
     Args:
         browser (Browser): An open Playwright Browser instance.
 
     Returns:
-        BrowserContext: A context with cookies pre-loaded from disk (if
-                        available) or a fresh context if no saved state exists.
+        BrowserContext: A context with cookies pre-loaded.
     """
     user_agent = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -85,13 +126,13 @@ def _build_context(browser: Browser) -> BrowserContext:
     )
 
     if _STORAGE_STATE_PATH.exists():
-        logger.debug("Loading existing CodeChef session from %s", _STORAGE_STATE_PATH)
+        logger.debug("Loading CodeChef session from %s", _STORAGE_STATE_PATH)
         return browser.new_context(
             storage_state=str(_STORAGE_STATE_PATH),
             user_agent=user_agent,
         )
 
-    logger.debug("No existing CodeChef session found — creating fresh context.")
+    logger.debug("No CodeChef session file found — using fresh context.")
     return browser.new_context(user_agent=user_agent)
 
 
@@ -196,9 +237,17 @@ def _extract_problem_from_page(page: Page, problem_url: str) -> dict:
     """
     logger.debug("Navigating to problem page: %s", problem_url)
     page.goto(problem_url, timeout=_WAIT_MS, wait_until="domcontentloaded")
+    page.wait_for_timeout(4000)  # wait for React to render
 
-    # Title — CodeChef uses an h1 or a specific class
-    title_el = page.query_selector("h1.title-txt, h1[class*='problem'], .problem-name h1, h1")
+    # Title — try multiple selectors for different CodeChef layouts
+    title_el = (
+        page.query_selector("h1.title-txt")
+        or page.query_selector("[class*='problem-title']")
+        or page.query_selector("[class*='ProblemTitle']")
+        or page.query_selector("h1[class*='problem']")
+        or page.query_selector(".problem-name h1")
+        or page.query_selector("h1")
+    )
     title: str = title_el.inner_text().strip() if title_el else "Unknown Problem"
 
     # Difficulty badge
@@ -210,9 +259,26 @@ def _extract_problem_from_page(page: Page, problem_url: str) -> dict:
         page.query_selector(".problem-statement")
         or page.query_selector("#problem-statement")
         or page.query_selector(".statement-body")
+        or page.query_selector("[class*='ProblemStatement']")
+        or page.query_selector("[class*='problem-statement']")
+        or page.query_selector("._content__KPo3")
         or page.query_selector("main article")
+        or page.query_selector("main")
     )
     description: str = statement_el.inner_text().strip() if statement_el else ""
+
+    # Last resort: grab all visible text from the page body
+    if not description or len(description) < 50:
+        logger.warning("Standard selectors failed — trying full page text for %s", problem_url)
+        try:
+            description = page.evaluate("""() => {
+                const main = document.querySelector('main') || document.body;
+                return main.innerText;
+            }""")
+            if description:
+                description = description.strip()
+        except Exception:
+            pass
 
     if not description:
         logger.warning("Could not extract problem description from %s", problem_url)
@@ -227,18 +293,17 @@ def _extract_problem_from_page(page: Page, problem_url: str) -> dict:
     }
 
 
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
 def fetch_daily_problem() -> dict:
     """
-    Launch a headless Chromium browser, log in to CodeChef (or reuse a saved
-    session), navigate to the Practice page, and fetch the first unsolved
-    problem from the Daily Practice section.
+    Launch a headless Chromium browser, authenticate via cookies from .env,
+    navigate to the Practice page, and fetch the first problem.
 
-    The browser context is persisted between calls within the same process to
-    avoid repeated logins.
+    No login form is used — cookies are injected directly from Config.
 
     Returns:
         dict: A problem dictionary with the following keys:
@@ -249,31 +314,32 @@ def fetch_daily_problem() -> dict:
             - platform    (str)  : Always "codechef"
 
     Raises:
-        RuntimeError: If login fails, the practice page cannot be navigated,
-                      or no problems are found in the daily section.
+        RuntimeError: If the practice page cannot be navigated or no
+                      problems are found.
     """
     logger.info("Fetching CodeChef daily problem…")
+
+    # Always rebuild session file from .env so latest cookies are used
+    _build_session_from_env()
 
     with sync_playwright() as pw:
         browser = pw.chromium.launch(
             headless=True,
-            args=["--disable-blink-features=AutomationControlled"]
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+            ]
         )
         context = _build_context(browser)
         page: Page = context.new_page()
 
         try:
-            # Attempt to reuse existing session first
-            if not _is_logged_in(page):
-                login(page)
-                _save_storage_state(context)
-
             logger.info("Navigating to CodeChef Practice page…")
             page.goto(_PRACTICE_URL, timeout=_WAIT_MS, wait_until="networkidle")
             page.wait_for_timeout(3000)
 
             # Look for Daily Practice section problems
-            # CodeChef's Practice page lists problems in card-style rows.
             problem_link: Optional[str] = None
 
             # Strategy: find any link inside a "daily" heading section
@@ -312,7 +378,6 @@ def fetch_daily_problem() -> dict:
                 f"CodeChef page timed out: {exc}"
             ) from exc
         finally:
-            _save_storage_state(context)
             browser.close()
 
     logger.info(

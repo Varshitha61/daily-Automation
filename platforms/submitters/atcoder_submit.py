@@ -6,6 +6,7 @@ Config), selects the task and language, injects code into CodeMirror, submits, a
 for the verdict.
 """
 
+import json
 import logging
 import time
 from pathlib import Path
@@ -31,6 +32,41 @@ _STORAGE_STATE_PATH: Path = (
 _LOGIN_URL: str = "https://atcoder.jp/login"
 _BASE_URL: str = "https://atcoder.jp"
 _WAIT_MS: int = 45_000
+
+
+def _build_session_from_env() -> None:
+    """
+    Build the Playwright storage state JSON from ATCODER_SESSION in .env.
+    Called before every submit so the latest cookie is always used.
+    """
+    if not Config.ATCODER_SESSION:
+        return
+    cookies = [
+        {
+            "name": "REVEL_SESSION",
+            "value": Config.ATCODER_SESSION,
+            "domain": "atcoder.jp",
+            "path": "/",
+            "expires": 1803529078.0,   # 2027-02-25
+            "httpOnly": True,
+            "secure": True,
+            "sameSite": "Lax",
+        },
+        {
+            "name": "REVEL_FLASH",
+            "value": "",
+            "domain": "atcoder.jp",
+            "path": "/",
+            "expires": -1,
+            "httpOnly": True,
+            "secure": True,
+            "sameSite": "Lax",
+        },
+    ]
+    state = {"cookies": cookies, "origins": []}
+    _STORAGE_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _STORAGE_STATE_PATH.write_text(json.dumps(state, indent=2))
+    logger.info("AtCoder session built from .env cookie.")
 
 
 def _build_context(browser: Browser) -> BrowserContext:
@@ -142,7 +178,8 @@ def submit_solution(problem: dict, code: str) -> dict:
         )
 
     submit_url = f"https://atcoder.jp/contests/{contest_id}/submit"
-    logger.info("Submitting AtCoder solution to %s for task %s", submit_url, problem_id)
+    # Build session file from cookie in .env before submitting
+    _build_session_from_env()
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
