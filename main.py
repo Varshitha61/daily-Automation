@@ -31,6 +31,7 @@ from typing import Optional
 from config import Config
 from storage import db
 from notifier import telegram
+from cookie_checker import send_cookie_warnings
 
 # Platform fetchers — imported lazily inside the pipeline to prevent a single
 # bad import from breaking the entire run.
@@ -361,6 +362,12 @@ async def run_daily_bot() -> None:
 
     # Step 1 — Validate config (raises ValueError on missing keys)
     Config.validate()
+
+    # Step 1.5 — Check cookie/token expiry and warn via Telegram
+    try:
+        await asyncio.to_thread(send_cookie_warnings)
+    except Exception as e:
+        logger.warning("Cookie expiry check failed: %s", e)
 
     # Step 2 — Ensure DB is ready
     db.init_db()
