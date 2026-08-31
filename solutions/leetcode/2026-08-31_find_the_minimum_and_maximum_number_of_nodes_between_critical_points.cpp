@@ -18,32 +18,33 @@ public:
         if (!head) return {-1, -1};
         int idx = 0;
         ListNode* prev = nullptr;
-        ListNode* curr = head;
-        ListNode* next = head->next;
-        int firstCrit = -1, prevCrit = -1;
-        int minDist = INT_MAX, maxDist = -1;
-        while (curr && next) {
-            // check if curr is a critical point (needs both prev and next)
+        ListNode* cur = head;
+        ListNode* next = cur->next;
+        int firstPos = -1, prevPos = -1;
+        int minDist = INT_MAX;
+        int maxDist = -1;
+        while (cur && next) {
+            // check critical point for cur (needs prev and next)
             if (prev) {
-                if ((curr->val > prev->val && curr->val > next->val) ||
-                    (curr->val < prev->val && curr->val < next->val)) {
-                    if (firstCrit == -1) {
-                        firstCrit = idx;
+                bool isMax = (cur->val > prev->val) && (cur->val > next->val);
+                bool isMin = (cur->val < prev->val) && (cur->val < next->val);
+                if (isMax || isMin) {
+                    if (firstPos == -1) {
+                        firstPos = idx;
                     } else {
-                        int dist = idx - prevCrit;
-                        minDist = min(minDist, dist);
-                        maxDist = max(maxDist, idx - firstCrit);
+                        minDist = min(minDist, idx - prevPos);
+                        maxDist = max(maxDist, idx - firstPos);
                     }
-                    prevCrit = idx;
+                    prevPos = idx;
                 }
             }
-            // move forward
-            prev = curr;
-            curr = next;
+            // advance
+            prev = cur;
+            cur = next;
             next = next->next;
             ++idx;
         }
-        if (minDist == INT_MAX) return {-1, -1};
+        if (firstPos == -1 || prevPos == firstPos) return {-1, -1};
         return {minDist, maxDist};
     }
 };

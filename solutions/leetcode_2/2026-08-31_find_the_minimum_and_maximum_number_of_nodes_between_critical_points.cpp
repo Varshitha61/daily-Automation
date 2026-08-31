@@ -1,6 +1,9 @@
 #include <bits/stdc++.h>
 using namespace std;
 
+/**
+ * Definition for singly-linked list.
+ */
 struct ListNode {
     int val;
     ListNode *next;
@@ -13,36 +16,28 @@ class Solution {
 public:
     vector<int> nodesBetweenCriticalPoints(ListNode* head) {
         if (!head) return {-1, -1};
+        vector<int> critPos;
         int idx = 0;
         ListNode* prev = nullptr;
-        ListNode* curr = head;
-        ListNode* next = curr->next;
-        int firstPos = -1, prevPos = -1;
-        int minDist = INT_MAX;
-        int lastPos = -1;
-        while (curr && next) {
-            // check critical point for curr (must have prev and next)
-            if (prev) {
-                bool isMax = (curr->val > prev->val) && (curr->val > next->val);
-                bool isMin = (curr->val < prev->val) && (curr->val < next->val);
-                if (isMax || isMin) {
-                    if (firstPos == -1) {
-                        firstPos = idx;
-                    } else {
-                        minDist = min(minDist, idx - prevPos);
-                    }
-                    prevPos = idx;
-                    lastPos = idx;
+        ListNode* cur = head;
+        while (cur) {
+            ListNode* nxt = cur->next;
+            if (prev && nxt) {
+                if ((prev->val < cur->val && cur->val > nxt->val) ||
+                    (prev->val > cur->val && cur->val < nxt->val)) {
+                    critPos.push_back(idx);
                 }
             }
-            // move forward
-            prev = curr;
-            curr = next;
-            next = next->next;
+            prev = cur;
+            cur = nxt;
             ++idx;
         }
-        if (firstPos == -1 || firstPos == prevPos) return {-1, -1};
-        int maxDist = lastPos - firstPos;
+        if (critPos.size() < 2) return {-1, -1};
+        int minDist = INT_MAX;
+        for (size_t i = 1; i < critPos.size(); ++i) {
+            minDist = min(minDist, critPos[i] - critPos[i-1]);
+        }
+        int maxDist = critPos.back() - critPos.front();
         return {minDist, maxDist};
     }
 };
