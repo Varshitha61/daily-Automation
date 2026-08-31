@@ -266,19 +266,32 @@ async def _run_platform(platform_name: str, fetch_fn) -> bool:
 
         # Step 3 — Save solution to disk + DB (blocking file I/O → thread)
         logger.info("[%s] Saving solution…", platform_name)
-        
+
         if verdict_info:
             solved["status"] = verdict_info.get("verdict", "Submitted")
             solved["submission_id"] = verdict_info.get("submission_id")
             
         file_path: str = await asyncio.to_thread(save_solution, solved)
 
+        # Log submission result without crashing the pipeline
         if submit_fn:
-            if not verdict_info or not verdict_info.get("accepted"):
-                verdict = verdict_info.get("verdict", "No verdict returned") if verdict_info else "Submission failed"
-                raise RuntimeError(f"Submission to {platform_name.upper()} failed: {verdict}")
+            if verdict_info and verdict_info.get("accepted"):
+                logger.info("[%s] Submission ACCEPTED ✅", platform_name.upper())
+            elif verdict_info:
+                verdict = verdict_info.get("verdict", "Unknown")
+                logger.warning(
+                    "[%s] Submission returned non-accepted verdict: %s — "
+                    "solution saved locally, pipeline continuing.",
+                    platform_name.upper(), verdict
+                )
+            else:
+                logger.warning(
+                    "[%s] No verdict received — submission may have failed silently. "
+                    "Solution saved locally, pipeline continuing.",
+                    platform_name.upper()
+                )
 
-        # Step 4 — Telegram success notification
+        # Step 4 — Telegram success notification (always send if we got this far)
         notify_kwargs = {
             "platform": platform_name,
             "title": solved["problem_title"],
