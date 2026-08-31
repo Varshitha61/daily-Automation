@@ -47,13 +47,14 @@ jobs:
           LEETCODE_CSRF_TOKEN: ${{ secrets.LEETCODE_CSRF_TOKEN }}
           LEETCODE_2_SESSION: ${{ secrets.LEETCODE_2_SESSION }}
           LEETCODE_2_CSRF_TOKEN: ${{ secrets.LEETCODE_2_CSRF_TOKEN }}
-          # ── Codeforces ─────────────────────────────────────────────────────────
+          # ── Codeforces ───────────────────────────────────────────────────────────────
           CODEFORCES_API_KEY: ${{ secrets.CODEFORCES_API_KEY }}
           CODEFORCES_API_SECRET: ${{ secrets.CODEFORCES_API_SECRET }}
           CODEFORCES_HANDLE: ${{ secrets.CODEFORCES_HANDLE }}
           CODEFORCES_39CE7: ${{ secrets.CODEFORCES_39CE7 }}
           CODEFORCES_JSESSIONID: ${{ secrets.CODEFORCES_JSESSIONID }}
           CODEFORCES_X_USER_SHA1: ${{ secrets.CODEFORCES_X_USER_SHA1 }}
+          CODEFORCES_CF_CLEARANCE: ${{ secrets.CODEFORCES_CF_CLEARANCE }}
           # ── CodeChef (Cookie-based auth + login credentials) ───────────────────
           CODECHEF_USERNAME: ${{ secrets.CODECHEF_USERNAME }}
           CODECHEF_PASSWORD: ${{ secrets.CODECHEF_PASSWORD }}

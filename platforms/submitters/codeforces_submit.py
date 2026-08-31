@@ -103,9 +103,11 @@ def _build_context(browser: Browser) -> BrowserContext:
     )
 
     # Priority 0.5: Direct env cookies
-    cf_39ce7 = Config.CODEFORCES_39CE7.strip()
+    cf_39ce7      = Config.CODEFORCES_39CE7.strip()
     cf_jsessionid = Config.CODEFORCES_JSESSIONID.strip()
-    cf_xuser = Config.CODEFORCES_X_USER_SHA1.strip()
+    cf_xuser      = Config.CODEFORCES_X_USER_SHA1.strip()
+    cf_clearance  = Config.CODEFORCES_CF_CLEARANCE.strip()
+
     if cf_39ce7:
         logger.info("Building Codeforces context using direct cookies from .env variables.")
         context = browser.new_context(**base_kwargs)
@@ -140,6 +142,23 @@ def _build_context(browser: Browser) -> BrowserContext:
                 "secure": True,
                 "sameSite": "Lax"
             })
+        # cf_clearance is the Cloudflare bypass cookie — CRITICAL for GitHub Actions
+        if cf_clearance:
+            cookies.append({
+                "name": "cf_clearance",
+                "value": cf_clearance,
+                "domain": ".codeforces.com",
+                "path": "/",
+                "httpOnly": False,
+                "secure": True,
+                "sameSite": "None"
+            })
+            logger.info("cf_clearance cookie injected — Cloudflare bypass active.")
+        else:
+            logger.warning(
+                "CODEFORCES_CF_CLEARANCE not set — Cloudflare may block submission. "
+                "Get it from DevTools → Application → Cookies → codeforces.com → cf_clearance"
+            )
         context.add_cookies(cookies)
         return context
 

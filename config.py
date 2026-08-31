@@ -59,6 +59,7 @@ class Config:
     CODEFORCES_39CE7: str = os.getenv("CODEFORCES_39CE7", "")
     CODEFORCES_JSESSIONID: str = os.getenv("CODEFORCES_JSESSIONID", "")
     CODEFORCES_X_USER_SHA1: str = os.getenv("CODEFORCES_X_USER_SHA1", "")
+    CODEFORCES_CF_CLEARANCE: str = os.getenv("CODEFORCES_CF_CLEARANCE", "")
 
     # ------------------------------------------------------------------
     # CodeChef — cookie-based auth + password login fallback
