@@ -54,7 +54,9 @@ jobs:
           CODEFORCES_39CE7: ${{ secrets.CODEFORCES_39CE7 }}
           CODEFORCES_JSESSIONID: ${{ secrets.CODEFORCES_JSESSIONID }}
           CODEFORCES_X_USER_SHA1: ${{ secrets.CODEFORCES_X_USER_SHA1 }}
-          # ── CodeChef (Cookie-based auth) ───────────────────────────────────────
+          # ── CodeChef (Cookie-based auth + login credentials) ───────────────────
+          CODECHEF_USERNAME: ${{ secrets.CODECHEF_USERNAME }}
+          CODECHEF_PASSWORD: ${{ secrets.CODECHEF_PASSWORD }}
           CODECHEF_AUTH_TOKEN: ${{ secrets.CODECHEF_AUTH_TOKEN }}
           CODECHEF_SESSION: ${{ secrets.CODECHEF_SESSION }}
           CODECHEF_CF_CLEARANCE: ${{ secrets.CODECHEF_CF_CLEARANCE }}

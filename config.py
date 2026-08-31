@@ -61,8 +61,10 @@ class Config:
     CODEFORCES_X_USER_SHA1: str = os.getenv("CODEFORCES_X_USER_SHA1", "")
 
     # ------------------------------------------------------------------
-    # CodeChef — cookie-based auth (no login needed)
+    # CodeChef — cookie-based auth + password login fallback
     # ------------------------------------------------------------------
+    CODECHEF_USERNAME:     str = os.getenv("CODECHEF_USERNAME", "")
+    CODECHEF_PASSWORD:     str = os.getenv("CODECHEF_PASSWORD", "")
     CODECHEF_AUTH_TOKEN:   str = os.getenv("CODECHEF_AUTH_TOKEN", "")
     CODECHEF_SESSION:      str = os.getenv("CODECHEF_SESSION", "")
     CODECHEF_CF_CLEARANCE: str = os.getenv("CODECHEF_CF_CLEARANCE", "")
