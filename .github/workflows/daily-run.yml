@@ -63,10 +63,6 @@ jobs:
           # ── HackerRank (Password auth) ─────────────────────────────────────────
           HACKERRANK_USERNAME: ${{ secrets.HACKERRANK_USERNAME }}
           HACKERRANK_PASSWORD: ${{ secrets.HACKERRANK_PASSWORD }}
-          # ── AtCoder ────────────────────────────────────────────────────────────
-          ATCODER_USERNAME: ${{ secrets.ATCODER_USERNAME }}
-          ATCODER_PASSWORD: ${{ secrets.ATCODER_PASSWORD }}
-          ATCODER_SESSION: ${{ secrets.ATCODER_SESSION }}
           DAILY_RUN_TIME: "08:00"
           SOLUTION_LANGUAGE: "cpp"
           LOG_LEVEL: "INFO"

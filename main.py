@@ -38,7 +38,6 @@ import platforms.leetcode as lc_fetcher
 import platforms.codeforces as cf_fetcher
 import platforms.codechef as cc_fetcher
 import platforms.hackerrank as hr_fetcher
-import platforms.atcoder as at_fetcher
 
 from solver.groq_solver import solve_problem
 
@@ -46,7 +45,6 @@ import platforms.submitters.leetcode_submit as lc_submit
 import platforms.submitters.codeforces_submit as cf_submit
 import platforms.submitters.codechef_submit as cc_submit
 import platforms.submitters.hackerrank_submit as hr_submit
-import platforms.submitters.atcoder_submit as at_submit
 
 _SUBMITTERS = {
     "leetcode": lc_submit.submit_solution,
@@ -54,7 +52,6 @@ _SUBMITTERS = {
     "codeforces": cf_submit.submit_solution,
     "codechef": cc_submit.submit_solution,
     "hackerrank": hr_submit.submit_solution,
-    "atcoder": at_submit.submit_solution,
 }
 
 
@@ -362,7 +359,6 @@ async def run_daily_bot() -> None:
         ("codeforces", cf_fetcher.fetch_daily_problem),
         ("codechef",   cc_fetcher.fetch_daily_problem),
         ("hackerrank", hr_fetcher.fetch_daily_problem),
-        ("atcoder",    at_fetcher.fetch_daily_problem),
     ]
 
     succeeded: list[str] = []

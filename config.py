@@ -75,12 +75,6 @@ class Config:
     HACKERRANK_USERNAME: str = os.getenv("HACKERRANK_USERNAME", "")
     HACKERRANK_PASSWORD: str = os.getenv("HACKERRANK_PASSWORD", "")
 
-    # ------------------------------------------------------------------
-    # AtCoder
-    # ------------------------------------------------------------------
-    ATCODER_USERNAME: str = os.getenv("ATCODER_USERNAME", "")
-    ATCODER_PASSWORD: str = os.getenv("ATCODER_PASSWORD", "")
-    ATCODER_SESSION:  str = os.getenv("ATCODER_SESSION", "")
 
 
     # ------------------------------------------------------------------
@@ -118,8 +112,6 @@ class Config:
         "CODECHEF_SESSION",
         "HACKERRANK_USERNAME",
         "HACKERRANK_PASSWORD",
-        "ATCODER_USERNAME",
-        "ATCODER_PASSWORD",
     ]
 
 
