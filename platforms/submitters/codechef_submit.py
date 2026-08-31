@@ -99,6 +99,7 @@ def _is_logged_in(page: Page) -> bool:
 def _login_with_credentials(page: Page) -> None:
     """
     Log in to CodeChef using CODECHEF_USERNAME and CODECHEF_PASSWORD.
+    Uses the same selectors as the working codechef.py fetcher.
     Raises RuntimeError if login fails.
     """
     logger.info("Logging in to CodeChef as '%s'…", Config.CODECHEF_USERNAME)
@@ -107,21 +108,88 @@ def _login_with_credentials(page: Page) -> None:
         page.goto(_LOGIN_URL, timeout=_WAIT_MS, wait_until="networkidle")
         time.sleep(2)
 
-        # Already logged in (session carried from storage state)
+        # Already logged in (session carried from storage state / redirect)
         if "login" not in page.url or _is_logged_in(page):
             logger.info("CodeChef: already logged in after redirect.")
             return
 
-        # Fill in the login form
-        page.locator("input#username").fill(Config.CODECHEF_USERNAME)
-        time.sleep(0.5)
-        page.locator("input#password").fill(Config.CODECHEF_PASSWORD)
+        # ── Fill username — try multiple selector strategies ──────────────
+        username_selectors = [
+            "form#ajax-login-form input[name='name']",   # primary (matches fetcher)
+            "input[name='name']",
+            "input[id='name']",
+            "input[placeholder*='Username']",
+            "input[placeholder*='Email']",
+            "input[type='email']",
+        ]
+        filled_user = False
+        for sel in username_selectors:
+            try:
+                el = page.locator(sel).first
+                if el.count() > 0:
+                    el.fill(Config.CODECHEF_USERNAME, force=True)
+                    filled_user = True
+                    logger.debug("Username filled via selector: %s", sel)
+                    break
+            except Exception:
+                continue
+
+        if not filled_user:
+            raise RuntimeError(
+                "Could not find CodeChef username input field. "
+                "The login page HTML may have changed."
+            )
+
+        # ── Fill password ─────────────────────────────────────────────────
+        password_selectors = [
+            "form#ajax-login-form input[name='pass']",   # primary (matches fetcher)
+            "input[name='pass']",
+            "input[name='password']",
+            "input[type='password']",
+        ]
+        filled_pass = False
+        for sel in password_selectors:
+            try:
+                el = page.locator(sel).first
+                if el.count() > 0:
+                    el.fill(Config.CODECHEF_PASSWORD, force=True)
+                    filled_pass = True
+                    logger.debug("Password filled via selector: %s", sel)
+                    break
+            except Exception:
+                continue
+
+        if not filled_pass:
+            raise RuntimeError(
+                "Could not find CodeChef password input field."
+            )
+
         time.sleep(0.5)
 
-        # Click Login button
-        page.locator("button[type='submit']:has-text('Login')").click()
+        # ── Click submit button ───────────────────────────────────────────
+        submit_selectors = [
+            "input.cc-login-btn",           # primary (matches fetcher)
+            "button[type='submit']",
+            "input[type='submit']",
+            "button:has-text('Login')",
+            "button:has-text('Sign In')",
+        ]
+        clicked = False
+        for sel in submit_selectors:
+            try:
+                el = page.locator(sel).first
+                if el.count() > 0:
+                    el.click(force=True)
+                    clicked = True
+                    logger.debug("Submit clicked via selector: %s", sel)
+                    break
+            except Exception:
+                continue
 
-        # Wait until we're redirected away from /login
+        if not clicked:
+            raise RuntimeError("Could not find CodeChef login submit button.")
+
+        # ── Wait for redirect away from /login ────────────────────────────
         try:
             page.wait_for_url(lambda url: "/login" not in url, timeout=20_000)
         except PWTimeout:
@@ -129,13 +197,13 @@ def _login_with_credentials(page: Page) -> None:
 
         if "/login" in page.url:
             error_el = page.query_selector(
-                ".error-message, [class*='error'], [class*='alert'], [role='alert']"
+                ".messages--error, .error-message, [class*='error'], [role='alert']"
             )
             error_text = error_el.inner_text().strip() if error_el else "Unknown error"
             raise RuntimeError(
                 f"CodeChef login failed — still on login page. "
                 f"Error: {error_text}. "
-                f"Check CODECHEF_USERNAME and CODECHEF_PASSWORD are correct."
+                f"Check CODECHEF_USERNAME and CODECHEF_PASSWORD."
             )
 
         logger.info("CodeChef login successful. URL: %s", page.url)
