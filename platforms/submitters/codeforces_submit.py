@@ -51,9 +51,10 @@ _STORAGE_STATE_PATH: Path = (
 _WAIT_MS: int = 60_000
 
 # Codeforces compiler IDs — keep in sync with what the site accepts
+# Check current IDs at: https://codeforces.com/problemset/submit
 _LANG_MAP = {
-    "cpp":     "54",   # GNU G++17 7.3.0
-    "c++":     "54",
+    "cpp":     "61",   # GNU G++17 9.2.0 (current default)
+    "c++":     "61",
     "python":  "31",   # Python 3.8.12
     "python3": "31",
     "java":    "36",   # Java 8

@@ -1,13 +1,15 @@
 """
 platforms/submitters/codechef_submit.py — CodeChef solution submitter using Playwright.
 
-Navigates to the problem page, logs in if necessary (using credentials from
-Config), injects the generated code into the Monaco editor, and submits.
+Uses cookie-based authentication (same as the fetcher) to navigate to the
+problem page, inject code into the Monaco editor, and submit.
 
-GitHub Actions compatibility:
-  - No session file is available between runs in CI, so this submitter
-    performs a full login using CODECHEF_USERNAME and CODECHEF_PASSWORD
-    every time the session file is absent.
+Required GitHub Secrets (cookie-based — refresh when expired):
+    CODECHEF_AUTH_TOKEN   — Authorization cookie value
+    CODECHEF_SESSION      — SESS... cookie value
+    CODECHEF_CF_CLEARANCE — cf_clearance cookie value
+    CODECHEF_UID          — uid cookie value
+    CODECHEF_USERKEY      — user_key cookie value
 """
 
 import logging
@@ -27,12 +29,6 @@ from platforms.codechef import _build_session_from_env, _STORAGE_STATE_PATH
 
 logger = logging.getLogger(__name__)
 
-# Path to the persistent browser profile created by codechef.py fetcher
-_STORAGE_STATE_PATH: Path = (
-    Path(__file__).parent.parent.parent / "logs" / "codechef_session.json"
-)
-
-_LOGIN_URL: str = "https://www.codechef.com/login"
 _BASE_URL: str = "https://www.codechef.com"
 _WAIT_MS: int = 45_000
 
@@ -60,56 +56,32 @@ def _build_context(browser: Browser) -> BrowserContext:
 
 
 def _is_logged_in(page: Page) -> bool:
-    """Return True if the CodeChef page shows a logged-in user element."""
+    """
+    Return True if the CodeChef page shows a logged-in user.
+    Uses multiple selector strategies to handle CodeChef's React UI.
+    """
     try:
-        el = page.query_selector("[class*='logout'], [class*='username-dropdown'], [class*='user-avatar']")
+        # Try cookie-based check first (most reliable)
+        cookies = page.context.cookies()
+        auth_cookie = next(
+            (c for c in cookies if c["name"] == "Authorization" and c["value"]),
+            None
+        )
+        if auth_cookie:
+            logger.debug("CodeChef: auth cookie present — assuming logged in.")
+            return True
+
+        # Fall back to DOM selectors
+        el = page.query_selector(
+            "a[href*='/users/'], "
+            "button[class*='avatar'], "
+            "img[class*='avatar'], "
+            "[data-username], "
+            "a[href='/logout']"
+        )
         return el is not None
     except Exception:
         return False
-
-
-def _login(page: Page) -> None:
-    """
-    Log in to CodeChef using credentials from Config.
-    Raises RuntimeError if login fails.
-    """
-    logger.info("Logging in to CodeChef as '%s'…", Config.CODECHEF_USERNAME)
-
-    try:
-        page.goto(_LOGIN_URL, timeout=_WAIT_MS, wait_until="networkidle")
-
-        # Already redirected away from login — session is valid
-        if "login" not in page.url:
-            logger.info("CodeChef: already logged in after redirect.")
-            return
-
-        # Fill login form
-        page.locator("form#ajax-login-form input[name='name']").fill(
-            Config.CODECHEF_USERNAME, force=True
-        )
-        page.locator("form#ajax-login-form input[name='pass']").fill(
-            Config.CODECHEF_PASSWORD, force=True
-        )
-        page.locator("input.cc-login-btn").click(force=True)
-
-        try:
-            page.wait_for_url(lambda url: "/login" not in url, timeout=15_000)
-        except PWTimeout:
-            pass
-
-        if "/login" in page.url:
-            error_el = page.query_selector(".messages--error, .error-message, [class*='error']")
-            error_text = error_el.inner_text() if error_el else "Unknown login error"
-            raise RuntimeError(
-                f"CodeChef login failed — still on login page. Error: {error_text}"
-            )
-
-        logger.info("CodeChef login successful. URL: %s", page.url)
-
-    except PWTimeout as exc:
-        raise RuntimeError(
-            f"CodeChef login timed out: {exc}"
-        ) from exc
 
 
 def _save_session(page: Page) -> None:
@@ -126,12 +98,12 @@ def submit_solution(problem: dict, code: str) -> dict:
     """
     Submit a solution to CodeChef via Playwright.
 
-    Logs in using CODECHEF_USERNAME/CODECHEF_PASSWORD if no saved session
-    is available (required for GitHub Actions runs).
+    Uses cookie-based auth (CODECHEF_AUTH_TOKEN etc.) — same as the fetcher.
+    No username/password login is attempted.
 
     Args:
         problem (dict): Must contain 'url' (the problem page URL).
-        code    (str): Full source code to submit.
+        code    (str):  Full source code to submit.
 
     Returns:
         dict: {
@@ -164,32 +136,40 @@ def submit_solution(problem: dict, code: str) -> dict:
         page = context.new_page()
 
         try:
-            # Navigate directly to home to verify cookies work
+            # ── 1. Navigate to home and verify cookies ──────────────────────
             page.goto(_BASE_URL, timeout=_WAIT_MS, wait_until="domcontentloaded")
-            time.sleep(2)
+            time.sleep(3)
 
             if not _is_logged_in(page):
-                raise RuntimeError("Your CodeChef cookies (CODECHEF_AUTH_TOKEN, etc.) have expired. Please log into codechef.com, copy the new cookies, and update your GitHub Actions Secrets.")
+                raise RuntimeError(
+                    "CodeChef cookies (CODECHEF_AUTH_TOKEN, CODECHEF_SESSION, etc.) "
+                    "have expired or are invalid. Please log into codechef.com in your "
+                    "browser, copy the new cookies, and update your GitHub Actions Secrets."
+                )
+
+            logger.info("CodeChef: session is valid, proceeding to submit.")
 
             # ── 2. Navigate to the problem page ────────────────────────────
             page.goto(url, timeout=_WAIT_MS, wait_until="domcontentloaded")
             time.sleep(3)
 
-            # ── 3. Click Submit/Solve button to enter submit mode ──────────
+            # ── 3. Click "Solve" or "Submit" button to open editor ─────────
             try:
-                # Try to find and click "Submit" button first
                 page.wait_for_selector(
                     "button:has-text('Submit'), button:has-text('Solve')",
                     timeout=15_000
                 )
-                submit_or_solve = page.locator("button:has-text('Solve')").first
-                if submit_or_solve.count() > 0:
-                    submit_or_solve.click()
+                # Prefer "Solve" first (opens submission panel)
+                solve_btn = page.locator("button:has-text('Solve')").first
+                if solve_btn.count() > 0:
+                    solve_btn.click()
                     time.sleep(2)
+                    logger.info("Clicked 'Solve' button to open editor.")
             except PWTimeout:
-                logger.warning("No Submit/Solve button found on CodeChef problem page.")
+                logger.warning("No Submit/Solve button found on CodeChef problem page — trying to submit directly.")
 
             # ── 4. Inject code into Monaco editor ─────────────────────────
+            time.sleep(2)  # let Monaco load
             injected = page.evaluate("""(code) => {
                 if (typeof monaco !== 'undefined' && monaco.editor.getModels().length > 0) {
                     monaco.editor.getModels()[0].setValue(code);
@@ -199,7 +179,7 @@ def submit_solution(problem: dict, code: str) -> dict:
             }""", code)
 
             if not injected:
-                logger.warning("Monaco not found — trying textarea fallback.")
+                logger.warning("Monaco not found — trying textarea/inputarea fallback.")
                 textarea = page.locator(".inputarea").first
                 if textarea.count() > 0:
                     textarea.click()
@@ -208,15 +188,16 @@ def submit_solution(problem: dict, code: str) -> dict:
                     page.evaluate("async (text) => await navigator.clipboard.writeText(text)", code)
                     page.keyboard.press("Control+V")
                     time.sleep(1)
+                    logger.info("Code injected via clipboard fallback.")
                 else:
-                    logger.warning("Could not find CodeChef editor textarea.")
+                    logger.warning("Could not find CodeChef editor — submission may fail.")
 
             time.sleep(1)
 
             # ── 5. Click the Submit button ─────────────────────────────────
             try:
-                # Use the last Submit button visible (after code entry)
                 submit_btn = page.locator("button:has-text('Submit')").last
+                submit_btn.wait_for(timeout=10_000)
                 submit_btn.click()
                 logger.info("Clicked CodeChef Submit button.")
             except Exception as e:
@@ -233,9 +214,9 @@ def submit_solution(problem: dict, code: str) -> dict:
                     .or_(page.locator("text='Time Limit Exceeded'"))
                     .or_(page.locator("text='Compilation Error'"))
                     .or_(page.locator("text='Runtime Error'"))
-                    .or_(page.locator("[class*='verdict'], [class*='result']"))
+                    .or_(page.locator("[class*='verdict'], [class*='result-verdict']"))
                 )
-                status_locator.first.wait_for(timeout=40_000)
+                status_locator.first.wait_for(timeout=60_000)
                 verdict = status_locator.first.inner_text().strip()
                 accepted = "Correct Answer" in verdict
                 logger.info("CodeChef verdict: %s", verdict)
