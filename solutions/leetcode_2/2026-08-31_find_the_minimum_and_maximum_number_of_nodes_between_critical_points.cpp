@@ -1,6 +1,9 @@
 #include <bits/stdc++.h>
 using namespace std;
 
+/**
+ * Definition for singly-linked list.
+ */
 struct ListNode {
     int val;
     ListNode *next;
@@ -12,28 +15,29 @@ struct ListNode {
 class Solution {
 public:
     vector<int> nodesBetweenCriticalPoints(ListNode* head) {
-        vector<int> crit;
+        if (!head) return {-1, -1};
+        vector<int> critPos;
+        int idx = 0;
         ListNode* prev = nullptr;
         ListNode* cur = head;
-        int idx = 0;
         while (cur) {
             ListNode* nxt = cur->next;
             if (prev && nxt) {
-                if ((cur->val > prev->val && cur->val > nxt->val) ||
-                    (cur->val < prev->val && cur->val < nxt->val)) {
-                    crit.push_back(idx);
+                if ((prev->val < cur->val && cur->val > nxt->val) ||
+                    (prev->val > cur->val && cur->val < nxt->val)) {
+                    critPos.push_back(idx);
                 }
             }
             prev = cur;
             cur = nxt;
             ++idx;
         }
-        if (crit.size() < 2) return {-1, -1};
+        if (critPos.size() < 2) return {-1, -1};
         int minDist = INT_MAX;
-        for (size_t i = 1; i < crit.size(); ++i) {
-            minDist = min(minDist, crit[i] - crit[i - 1]);
+        for (size_t i = 1; i < critPos.size(); ++i) {
+            minDist = min(minDist, critPos[i] - critPos[i-1]);
         }
-        int maxDist = crit.back() - crit.front();
+        int maxDist = critPos.back() - critPos.front();
         return {minDist, maxDist};
     }
 };

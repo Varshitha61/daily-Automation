@@ -3,9 +3,9 @@ using namespace std;
 int main() {
     ios::sync_with_stdio(false);
     cin.tie(nullptr);
-    int t;
-    if(!(cin >> t)) return 0;
-    while(t--) {
+    int T;
+    if(!(cin >> T)) return 0;
+    while (T--) {
         long long n, k;
         cin >> n >> k; // k is always 3
         if (n % 2 == 1) {
