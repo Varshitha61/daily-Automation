@@ -1,6 +1,9 @@
 #include <bits/stdc++.h>
 using namespace std;
 
+/**
+ * Definition for singly-linked list.
+ */
 struct ListNode {
     int val;
     ListNode *next;
@@ -13,28 +16,34 @@ class Solution {
 public:
     vector<int> nodesBetweenCriticalPoints(ListNode* head) {
         if (!head) return {-1, -1};
-        vector<int> critPos;
         int idx = 0;
         ListNode* prev = nullptr;
-        ListNode* cur = head;
-        while (cur) {
-            ListNode* nxt = cur->next;
-            if (prev && nxt) {
-                if ((prev->val < cur->val && cur->val > nxt->val) ||
-                    (prev->val > cur->val && cur->val < nxt->val)) {
-                    critPos.push_back(idx);
+        ListNode* curr = head;
+        ListNode* next = head->next;
+        int firstCrit = -1, prevCrit = -1;
+        int minDist = INT_MAX, maxDist = -1;
+        while (curr && next) {
+            // check if curr is a critical point (needs both prev and next)
+            if (prev) {
+                if ((curr->val > prev->val && curr->val > next->val) ||
+                    (curr->val < prev->val && curr->val < next->val)) {
+                    if (firstCrit == -1) {
+                        firstCrit = idx;
+                    } else {
+                        int dist = idx - prevCrit;
+                        minDist = min(minDist, dist);
+                        maxDist = max(maxDist, idx - firstCrit);
+                    }
+                    prevCrit = idx;
                 }
             }
-            prev = cur;
-            cur = nxt;
+            // move forward
+            prev = curr;
+            curr = next;
+            next = next->next;
             ++idx;
         }
-        if (critPos.size() < 2) return {-1, -1};
-        int minDist = INT_MAX;
-        for (size_t i = 1; i < critPos.size(); ++i) {
-            minDist = min(minDist, critPos[i] - critPos[i-1]);
-        }
-        int maxDist = critPos.back() - critPos.front();
+        if (minDist == INT_MAX) return {-1, -1};
         return {minDist, maxDist};
     }
 };
