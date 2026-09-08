@@ -7,9 +7,11 @@ int main() {
     int T;
     if(!(cin >> T)) return 0;
     while (T--) {
-        long long X, Y;
-        cin >> X >> Y;
-        cout << llabs(X - Y) << "\n";
+        int X;
+        cin >> X;
+        if (X <= 50) cout << "LEFT";
+        else cout << "RIGHT";
+        if (T) cout << '\n';
     }
     return 0;
 }
