@@ -10,19 +10,18 @@ public:
             mp[kv[0]] = kv[1];
         }
         string res;
-        res.reserve(s.size() * 2);
-        int n = s.size();
-        for (int i = 0; i < n; ++i) {
-            if (s[i] != '(') {
-                res.push_back(s[i]);
-            } else {
-                int j = i + 1;
-                while (j < n && s[j] != ')') ++j;
+        res.reserve(s.size());
+        for (size_t i = 0; i < s.size(); ++i) {
+            if (s[i] == '(') {
+                size_t j = i + 1;
+                while (j < s.size() && s[j] != ')') ++j;
                 string key = s.substr(i + 1, j - i - 1);
                 auto it = mp.find(key);
                 if (it != mp.end()) res += it->second;
-                else res.push_back('?');
-                i = j; // move to closing ')'
+                else res += '?';
+                i = j; // skip to ')'
+            } else {
+                res += s[i];
             }
         }
         return res;
