@@ -20,7 +20,7 @@ public:
                 auto it = mp.find(key);
                 if (it != mp.end()) res += it->second;
                 else res.push_back('?');
-                i = j; // will be incremented by loop
+                i = j; // skip to ')'
             } else {
                 res.push_back(s[i]);
             }
