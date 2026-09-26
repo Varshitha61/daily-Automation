@@ -43,39 +43,39 @@ class Config:
     # ------------------------------------------------------------------
     # LeetCode
     # ------------------------------------------------------------------
-    LEETCODE_SESSION: str = os.getenv("LEETCODE_SESSION", "")
-    LEETCODE_CSRF_TOKEN: str = os.getenv("LEETCODE_CSRF_TOKEN", "")
-    LEETCODE_2_SESSION: str = os.getenv("LEETCODE_2_SESSION", "")
-    LEETCODE_2_CSRF_TOKEN: str = os.getenv("LEETCODE_2_CSRF_TOKEN", "")
+    LEETCODE_SESSION: str = os.getenv("LEETCODE_SESSION", "").strip()
+    LEETCODE_CSRF_TOKEN: str = os.getenv("LEETCODE_CSRF_TOKEN", "").strip()
+    LEETCODE_2_SESSION: str = os.getenv("LEETCODE_2_SESSION", "").strip()
+    LEETCODE_2_CSRF_TOKEN: str = os.getenv("LEETCODE_2_CSRF_TOKEN", "").strip()
 
 
     # ------------------------------------------------------------------
     # Codeforces
     # ------------------------------------------------------------------
-    CODEFORCES_API_KEY: str = os.getenv("CODEFORCES_API_KEY", "")
-    CODEFORCES_API_SECRET: str = os.getenv("CODEFORCES_API_SECRET", "")
-    CODEFORCES_HANDLE: str = os.getenv("CODEFORCES_HANDLE", "")
+    CODEFORCES_API_KEY: str = os.getenv("CODEFORCES_API_KEY", "").strip()
+    CODEFORCES_API_SECRET: str = os.getenv("CODEFORCES_API_SECRET", "").strip()
+    CODEFORCES_HANDLE: str = os.getenv("CODEFORCES_HANDLE", "").strip()
     CODEFORCES_PASSWORD: str = os.getenv("CODEFORCES_PASSWORD", "")
-    CODEFORCES_39CE7: str = os.getenv("CODEFORCES_39CE7", "")
-    CODEFORCES_JSESSIONID: str = os.getenv("CODEFORCES_JSESSIONID", "")
-    CODEFORCES_X_USER_SHA1: str = os.getenv("CODEFORCES_X_USER_SHA1", "")
-    CODEFORCES_CF_CLEARANCE: str = os.getenv("CODEFORCES_CF_CLEARANCE", "")
+    CODEFORCES_39CE7: str = os.getenv("CODEFORCES_39CE7", "").strip()
+    CODEFORCES_JSESSIONID: str = os.getenv("CODEFORCES_JSESSIONID", "").strip()
+    CODEFORCES_X_USER_SHA1: str = os.getenv("CODEFORCES_X_USER_SHA1", "").strip()
+    CODEFORCES_CF_CLEARANCE: str = os.getenv("CODEFORCES_CF_CLEARANCE", "").strip()
 
     # ------------------------------------------------------------------
     # CodeChef — cookie-based auth + password login fallback
     # ------------------------------------------------------------------
-    CODECHEF_USERNAME:     str = os.getenv("CODECHEF_USERNAME", "")
+    CODECHEF_USERNAME:     str = os.getenv("CODECHEF_USERNAME", "").strip()
     CODECHEF_PASSWORD:     str = os.getenv("CODECHEF_PASSWORD", "")
-    CODECHEF_AUTH_TOKEN:   str = os.getenv("CODECHEF_AUTH_TOKEN", "")
-    CODECHEF_SESSION:      str = os.getenv("CODECHEF_SESSION", "")
-    CODECHEF_CF_CLEARANCE: str = os.getenv("CODECHEF_CF_CLEARANCE", "")
-    CODECHEF_UID:          str = os.getenv("CODECHEF_UID", "")
-    CODECHEF_USERKEY:      str = os.getenv("CODECHEF_USERKEY", "")
+    CODECHEF_AUTH_TOKEN:   str = os.getenv("CODECHEF_AUTH_TOKEN", "").strip()
+    CODECHEF_SESSION:      str = os.getenv("CODECHEF_SESSION", "").strip()
+    CODECHEF_CF_CLEARANCE: str = os.getenv("CODECHEF_CF_CLEARANCE", "").strip()
+    CODECHEF_UID:          str = os.getenv("CODECHEF_UID", "").strip()
+    CODECHEF_USERKEY:      str = os.getenv("CODECHEF_USERKEY", "").strip()
 
     # ------------------------------------------------------------------
     # HackerRank
     # ------------------------------------------------------------------
-    HACKERRANK_USERNAME: str = os.getenv("HACKERRANK_USERNAME", "")
+    HACKERRANK_USERNAME: str = os.getenv("HACKERRANK_USERNAME", "").strip()
     HACKERRANK_PASSWORD: str = os.getenv("HACKERRANK_PASSWORD", "")
 
 
