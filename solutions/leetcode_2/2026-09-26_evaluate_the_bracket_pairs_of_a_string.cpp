@@ -11,18 +11,17 @@ public:
         }
         string res;
         res.reserve(s.size());
-        int n = s.size();
-        for (int i = 0; i < n; ++i) {
+        for (size_t i = 0; i < s.size(); ++i) {
             if (s[i] == '(') {
-                int j = i + 1;
-                while (j < n && s[j] != ')') ++j;
+                size_t j = i + 1;
+                while (j < s.size() && s[j] != ')') ++j;
                 string key = s.substr(i + 1, j - i - 1);
                 auto it = mp.find(key);
                 if (it != mp.end()) res += it->second;
-                else res.push_back('?');
-                i = j; // skip to ')'
+                else res += '?';
+                i = j; // will be incremented by loop
             } else {
-                res.push_back(s[i]);
+                res += s[i];
             }
         }
         return res;
