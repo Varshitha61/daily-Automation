@@ -12,18 +12,17 @@ public:
         string res;
         res.reserve(s.size());
         int n = s.size();
-        for (int i = 0; i < n; ) {
+        for (int i = 0; i < n; ++i) {
             if (s[i] == '(') {
                 int j = i + 1;
                 while (j < n && s[j] != ')') ++j;
                 string key = s.substr(i + 1, j - i - 1);
                 auto it = mp.find(key);
                 if (it != mp.end()) res += it->second;
-                else res += '?';
-                i = j + 1; // skip ')'
+                else res.push_back('?');
+                i = j; // skip to ')'
             } else {
-                res += s[i];
-                ++i;
+                res.push_back(s[i]);
             }
         }
         return res;
