@@ -8,7 +8,7 @@ public:
         mp.reserve(knowledge.size() * 2);
         for (auto &kv : knowledge) mp[kv[0]] = kv[1];
         string res;
-        res.reserve(s.size() * 2);
+        res.reserve(s.size());
         int n = s.size();
         for (int i = 0; i < n; ) {
             if (s[i] == '(') {
