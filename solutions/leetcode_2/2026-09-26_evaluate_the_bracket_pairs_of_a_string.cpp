@@ -11,15 +11,16 @@ public:
         }
         string res;
         res.reserve(s.size());
-        for (size_t i = 0; i < s.size(); ++i) {
+        int n = s.size();
+        for (int i = 0; i < n; ++i) {
             if (s[i] == '(') {
-                size_t j = i + 1;
-                while (j < s.size() && s[j] != ')') ++j;
+                int j = i + 1;
+                while (j < n && s[j] != ')') ++j;
                 string key = s.substr(i + 1, j - i - 1);
                 auto it = mp.find(key);
                 if (it != mp.end()) res += it->second;
                 else res.push_back('?');
-                i = j; // skip to ')'
+                i = j; // will be incremented by loop
             } else {
                 res.push_back(s[i]);
             }
