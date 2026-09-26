@@ -109,13 +109,13 @@ def _get_csrf_token(session: requests.Session, url: str) -> str:
 
     # Extract CSRF token — it's in a <meta> tag or hidden form field
     patterns = [
-        r'<meta name="X-Csrf-Token" content="([^"]+)"',
-        r"csrf_token['\"]?\s*[:=]\s*['\"]([a-f0-9]{32})",
-        r'name="csrf_token"\s+value="([^"]+)"',
-        r'value="([a-f0-9]{32})"',
+        re.compile(r'<meta[^>]+name=[\'"]X-Csrf-Token[\'"][^>]+content=[\'"]([^\'"]+)[\'"]', re.IGNORECASE),
+        re.compile(r"csrf_token['\"]?\s*[:=]\s*['\"]([a-fA-F0-9]{32,})", re.IGNORECASE),
+        re.compile(r'name=[\'"]csrf_token[\'"]\s+value=[\'"]([^\'"]+)[\'"]', re.IGNORECASE),
+        re.compile(r'value=[\'"]([a-fA-F0-9]{32,})[\'"]', re.IGNORECASE),
     ]
     for pattern in patterns:
-        match = re.search(pattern, resp.text)
+        match = pattern.search(resp.text)
         if match:
             token = match.group(1)
             logger.debug("CSRF token found: %s…", token[:8])
