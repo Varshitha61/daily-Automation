@@ -122,7 +122,10 @@ def _check_cf_clearance(name: str, value: str) -> Optional[str]:
             logger.debug("Could not parse cf_clearance timestamp from value.")
             return None
 
-        exp = datetime.fromtimestamp(exp_ts, tz=timezone.utc)
+        # The timestamp in cf_clearance is the CREATION date, not the expiry date.
+        # cf_clearance cookies are typically valid for 1 year (365 days).
+        issue_date = datetime.fromtimestamp(exp_ts, tz=timezone.utc)
+        exp = issue_date + __import__("datetime").timedelta(days=365)
         now = datetime.now(tz=timezone.utc)
         diff = exp - now
         days_left = diff.total_seconds() / 86400
