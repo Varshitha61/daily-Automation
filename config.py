@@ -40,42 +40,49 @@ class Config:
     TELEGRAM_BOT_TOKEN: str = os.getenv("TELEGRAM_BOT_TOKEN", "").strip().replace("%0A", "")
     TELEGRAM_CHAT_ID: str = os.getenv("TELEGRAM_CHAT_ID", "").strip().replace("%0A", "")
 
+    @staticmethod
+    def _clean_cookie(val: str | None) -> str:
+        if not val:
+            return ""
+        # Remove all possible whitespace, newlines, and carriage returns
+        import re
+        return re.sub(r"\s+", "", val)
+
     # ------------------------------------------------------------------
     # LeetCode
     # ------------------------------------------------------------------
-    LEETCODE_SESSION: str = os.getenv("LEETCODE_SESSION", "").strip()
-    LEETCODE_CSRF_TOKEN: str = os.getenv("LEETCODE_CSRF_TOKEN", "").strip()
-    LEETCODE_2_SESSION: str = os.getenv("LEETCODE_2_SESSION", "").strip()
-    LEETCODE_2_CSRF_TOKEN: str = os.getenv("LEETCODE_2_CSRF_TOKEN", "").strip()
-
+    LEETCODE_SESSION: str = _clean_cookie(os.getenv("LEETCODE_SESSION", ""))
+    LEETCODE_CSRF_TOKEN: str = _clean_cookie(os.getenv("LEETCODE_CSRF_TOKEN", ""))
+    LEETCODE_2_SESSION: str = _clean_cookie(os.getenv("LEETCODE_2_SESSION", ""))
+    LEETCODE_2_CSRF_TOKEN: str = _clean_cookie(os.getenv("LEETCODE_2_CSRF_TOKEN", ""))
 
     # ------------------------------------------------------------------
     # Codeforces
     # ------------------------------------------------------------------
-    CODEFORCES_API_KEY: str = os.getenv("CODEFORCES_API_KEY", "").strip()
-    CODEFORCES_API_SECRET: str = os.getenv("CODEFORCES_API_SECRET", "").strip()
-    CODEFORCES_HANDLE: str = os.getenv("CODEFORCES_HANDLE", "").strip()
+    CODEFORCES_API_KEY: str = _clean_cookie(os.getenv("CODEFORCES_API_KEY", ""))
+    CODEFORCES_API_SECRET: str = _clean_cookie(os.getenv("CODEFORCES_API_SECRET", ""))
+    CODEFORCES_HANDLE: str = _clean_cookie(os.getenv("CODEFORCES_HANDLE", ""))
     CODEFORCES_PASSWORD: str = os.getenv("CODEFORCES_PASSWORD", "")
-    CODEFORCES_39CE7: str = os.getenv("CODEFORCES_39CE7", "").strip()
-    CODEFORCES_JSESSIONID: str = os.getenv("CODEFORCES_JSESSIONID", "").strip()
-    CODEFORCES_X_USER_SHA1: str = os.getenv("CODEFORCES_X_USER_SHA1", "").strip()
-    CODEFORCES_CF_CLEARANCE: str = os.getenv("CODEFORCES_CF_CLEARANCE", "").strip()
+    CODEFORCES_39CE7: str = _clean_cookie(os.getenv("CODEFORCES_39CE7", ""))
+    CODEFORCES_JSESSIONID: str = _clean_cookie(os.getenv("CODEFORCES_JSESSIONID", ""))
+    CODEFORCES_X_USER_SHA1: str = _clean_cookie(os.getenv("CODEFORCES_X_USER_SHA1", ""))
+    CODEFORCES_CF_CLEARANCE: str = _clean_cookie(os.getenv("CODEFORCES_CF_CLEARANCE", ""))
 
     # ------------------------------------------------------------------
     # CodeChef — cookie-based auth + password login fallback
     # ------------------------------------------------------------------
-    CODECHEF_USERNAME:     str = os.getenv("CODECHEF_USERNAME", "").strip()
+    CODECHEF_USERNAME:     str = _clean_cookie(os.getenv("CODECHEF_USERNAME", ""))
     CODECHEF_PASSWORD:     str = os.getenv("CODECHEF_PASSWORD", "")
-    CODECHEF_AUTH_TOKEN:   str = os.getenv("CODECHEF_AUTH_TOKEN", "").strip()
-    CODECHEF_SESSION:      str = os.getenv("CODECHEF_SESSION", "").strip()
-    CODECHEF_CF_CLEARANCE: str = os.getenv("CODECHEF_CF_CLEARANCE", "").strip()
-    CODECHEF_UID:          str = os.getenv("CODECHEF_UID", "").strip()
-    CODECHEF_USERKEY:      str = os.getenv("CODECHEF_USERKEY", "").strip()
+    CODECHEF_AUTH_TOKEN:   str = _clean_cookie(os.getenv("CODECHEF_AUTH_TOKEN", ""))
+    CODECHEF_SESSION:      str = _clean_cookie(os.getenv("CODECHEF_SESSION", ""))
+    CODECHEF_CF_CLEARANCE: str = _clean_cookie(os.getenv("CODECHEF_CF_CLEARANCE", ""))
+    CODECHEF_UID:          str = _clean_cookie(os.getenv("CODECHEF_UID", ""))
+    CODECHEF_USERKEY:      str = _clean_cookie(os.getenv("CODECHEF_USERKEY", ""))
 
     # ------------------------------------------------------------------
     # HackerRank
     # ------------------------------------------------------------------
-    HACKERRANK_USERNAME: str = os.getenv("HACKERRANK_USERNAME", "").strip()
+    HACKERRANK_USERNAME: str = _clean_cookie(os.getenv("HACKERRANK_USERNAME", ""))
     HACKERRANK_PASSWORD: str = os.getenv("HACKERRANK_PASSWORD", "")
 
 
